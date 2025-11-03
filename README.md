@@ -6,16 +6,16 @@
 
 ## 📋 Table of Contents
 
-1. [Overview](https://claude.ai/chat/d3083e52-3bad-47a2-bcd8-29ed6c0927f4#overview)
-2. [Quick Setup](https://claude.ai/chat/d3083e52-3bad-47a2-bcd8-29ed6c0927f4#quick-setup)
-3. [Detailed Setup Instructions](https://claude.ai/chat/d3083e52-3bad-47a2-bcd8-29ed6c0927f4#detailed-setup-instructions)
-4. [API Endpoints](https://claude.ai/chat/d3083e52-3bad-47a2-bcd8-29ed6c0927f4#api-endpoints)
-5. [Code Architecture](https://claude.ai/chat/d3083e52-3bad-47a2-bcd8-29ed6c0927f4#code-architecture)
-6. [Integration Guide](https://claude.ai/chat/d3083e52-3bad-47a2-bcd8-29ed6c0927f4#integration-guide)
-7. [Testing](https://claude.ai/chat/d3083e52-3bad-47a2-bcd8-29ed6c0927f4#testing)
-8. [Configuration](https://claude.ai/chat/d3083e52-3bad-47a2-bcd8-29ed6c0927f4#configuration)
-9. [Troubleshooting](https://claude.ai/chat/d3083e52-3bad-47a2-bcd8-29ed6c0927f4#troubleshooting)
-10. [Production Deployment](https://claude.ai/chat/d3083e52-3bad-47a2-bcd8-29ed6c0927f4#production-deployment)
+1. [Overview]()
+2. [Quick Setup]()
+3. [Detailed Setup Instructions]()
+4. [API Endpoints]()
+5. [Code Architecture]()
+6. [Integration Guide]()
+7. [Testing]()
+8. [Configuration]()
+9. [Troubleshooting]()
+10. [Production Deployment]()
 
 ---
 
@@ -358,12 +358,12 @@ async function sendMessage(message, senderId, receiverId, conversationId) {
       // Message sent successfully
       const messageId = response.data.data.messageId;
       const isFlagged = response.data.data.flagged;
-    
+  
       if (isFlagged) {
         // Optional: Show warning to user
         showWarning('Your message has been flagged for review');
       }
-    
+  
       // Save to your database, update UI, etc.
       return messageId;
     }
