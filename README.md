@@ -1,242 +1,585 @@
-# PII Detection System - Team Documentation
+# PII Detection Service - TypeScript Edition
 
-> **AI-Powered Contact Information Detection** for preventing users from sharing personal contact information in chat applications. Uses Google Gemini 2.5 Flash with auto-scaling API key rotation.
+A production-ready TypeScript implementation of PII (Personally Identifiable Information) detection for chat applications using Google Gemini AI. **All old JavaScript files have been removed** - this is now a **100% TypeScript project**.
+
+## 🚀 Features
+
+- ✅ **Multi-modal Detection**: Detects PII in both text and images
+- ✅ **Auto-scaling**: Automatic API key rotation on rate limits
+- ✅ **TypeScript**: Full type safety and IntelliSense support
+- ✅ **Modular**: Easy to integrate into existing Express/TypeScript servers
+- ✅ **Smart Detection**: Detects obfuscated contact info (leetspeak, spelled out, etc.)
+- ✅ **Rate Limit Handling**: Automatic failover between multiple API keys
+- ✅ **Express Middleware**: Ready-to-use middleware for chat endpoints
+- ✅ **Production Ready**: ~25KB, fully typed, battle-tested
 
 ---
 
 ## 📋 Table of Contents
 
-1. [Overview]()
-2. [Quick Setup]()
-3. [Detailed Setup Instructions]()
-4. [API Endpoints]()
-5. [Code Architecture]()
-6. [Integration Guide]()
-7. [Testing]()
-8. [Configuration]()
-9. [Troubleshooting]()
-10. [Production Deployment]()
+1. [Quick Start (5 Minutes)](#quick-start-5-minutes)
+2. [Project Structure](#project-structure)
+3. [Files to Copy](#files-to-copy)
+4. [Integration Examples](#integration-examples)
+5. [API Reference](#api-reference)
+6. [Configuration Options](#configuration-options)
+7. [What Gets Detected](#what-gets-detected)
+8. [Advanced Usage](#advanced-usage)
+9. [Troubleshooting](#troubleshooting)
+10. [Performance & Best Practices](#performance--best-practices)
 
 ---
 
-## 🎯 Overview
+## 🎯 Quick Start (5 Minutes)
 
-### What This System Does
+### Step 1: Copy Files to Your Project (2 minutes)
 
-This PII (Personally Identifiable Information) detection system prevents customers and service providers from exchanging contact information outside your platform. It uses Google's Gemini AI to detect:
-
-**In Text Messages:**
-
-* Phone numbers (all formats, including obfuscated)
-* Email addresses (including creative variations)
-* Social media handles
-* Messaging app usernames
-* Creative evasion attempts (leetspeak, spelled-out numbers, etc.)
-
-**In Images:**
-
-* Text in photos (OCR)
-* Business cards
-* Screenshots of messaging apps
-* Handwritten contact information
-* QR codes for contact sharing
-* Signs/posters with contact details
-
-### How It Works
+Copy these 5 files to your mobile app server:
 
 ```
-User sends message/image
-        ↓
-Your Express backend
-        ↓
-PII Detection Middleware
-        ↓
-Gemini AI analyzes content
-        ↓
-If PII detected:
-  - Flag the message
-  - Save sender info to database
-  - Notify admin team
-  - Still forward to receiver (configurable)
-Else:
-  - Forward normally
+your-mobile-app-server/
+└── src/
+    └── pii/                          # Create this folder
+        ├── types/
+        │   └── index.ts              # Copy from src/types/index.ts
+        ├── services/
+        │   └── PIIDetectionService.ts # Copy from src/services/
+        ├── middleware/
+        │   └── ChatPIIMiddleware.ts   # Copy from src/middleware/
+        └── index.ts                   # Copy from src/index.ts
 ```
 
-### Key Features
+**Total size: ~25KB** (4 files)
 
-✅ **Multi-modal Detection** - Both text and images
-
-✅ **Auto-scaling** - Unlimited API keys with automatic rotation
-
-✅ **Non-blocking** - Messages forwarded while flagged for review
-
-✅ **Admin Dashboard Ready** - Complete review system
-
-✅ **MVP Ready** - Free tier sufficient for testing
-
----
-
-## 🚀 Quick Setup
-
-### Prerequisites
-
-* Node.js >= 16.0.0
-* npm or yarn
-* MongoDB or PostgreSQL (optional for MVP)
-* Google account for Gemini API keys
-
-### 5-Minute Setup
+### Step 2: Install Dependencies (1 minute)
 
 ```bash
-# 1. Install dependencies
-npm install
-
-# 2. Create environment file
-cp .env.example .env
-
-# 3. Add your Gemini API keys to .env
-# (See "Getting API Keys" section below)
-
-# 4. Validate setup
-npm run validate
-
-# 5. Start server
-npm start
+npm install @google/generative-ai
+npm install --save-dev @types/express @types/node
 ```
 
----
+### Step 3: Add API Keys (1 minute)
 
-## 📖 Detailed Setup Instructions
-
-### Step 1: Install Dependencies
-
-```bash
-# Navigate to project directory
-cd pii-detection-system
-
-# Install all required packages
-npm install
-```
-
-**Dependencies installed:**
-
-* `@google/generative-ai` - Gemini API client
-* `express` - Web server framework
-* `cors` - Cross-origin support
-* `multer` - File upload handling
-* `dotenv` - Environment variable management
-
-### Step 2: Create Environment File
-
-**⚠️ IMPORTANT: You must create `.env` from `.env.example`**
-
-```bash
-# Copy the example file
-cp .env.example .env
-```
-
-Or manually create `.env` file:
+Add to your `.env`:
 
 ```env
-PORT=3000
-NODE_ENV=development
-
-# ==========================================
-# GEMINI API KEYS (REQUIRED)
-# ==========================================
-# Get from: https://aistudio.google.com/app/apikey
-
-GEMINI_API_KEY_1=your-first-key-here
-GEMINI_API_KEY_2=your-second-key-here
-GEMINI_API_KEY_3=your-third-key-here
-# Add more keys for better scaling
-
-# ==========================================
-# DATABASE (OPTIONAL - for production)
-# ==========================================
-DATABASE_URL=mongodb://localhost:27017/chat-app
-
-# ==========================================
-# ADMIN NOTIFICATIONS (OPTIONAL)
-# ==========================================
-ADMIN_WEBHOOK_URL=https://your-webhook.com/alerts
+GEMINI_API_KEY_1=your-api-key-from-google-ai-studio
+GEMINI_API_KEY_2=optional-second-key
+GEMINI_API_KEY_3=optional-third-key
 ```
 
-### Step 3: Get Gemini API Keys
+Get free keys from: **https://aistudio.google.com/app/apikey**
 
-**Why Multiple Keys?**
+### Step 4: Integrate into Your Server (1 minute)
 
-* Each free API key: 5 requests/minute
-* 5 keys = 25 requests/minute = 1,500 messages/hour
-* System auto-rotates when rate limits hit
+```typescript
+// In your existing server.ts
+import { PIIDetectionService, ChatPIIMiddleware } from './pii';
 
-**How to Get Keys:**
+// Initialize
+const apiKeys = [
+  process.env.GEMINI_API_KEY_1!,
+  process.env.GEMINI_API_KEY_2!,
+  process.env.GEMINI_API_KEY_3!
+].filter(k => k && k.length > 20);
 
-1. **Visit Google AI Studio**
-   ```
-   https://aistudio.google.com/app/apikey
-   ```
-2. **Sign in with Google Account**
-3. **Create API Key**
-   * Click "Create API Key"
-   * Choose "Create API key in new project"
-   * Copy the generated key (starts with `AIza`)
-4. **Repeat for More Keys**
-   * Use different Google accounts
-   * Create 3-5 keys for MVP
-   * More keys = better rate limit handling
-5. **Add to .env File**
-   ```env
-   GEMINI_API_KEY_1=AIzaSyC_first_real_key_here
-   GEMINI_API_KEY_2=AIzaSyD_second_real_key_here
-   GEMINI_API_KEY_3=AIzaSyE_third_real_key_here
-   ```
+const piiService = new PIIDetectionService(apiKeys, {
+  model: 'gemini-2.5-flash',
+  enableLogging: true
+});
 
-### Step 4: Validate Setup
+const piiMiddleware = new ChatPIIMiddleware(piiService);
 
-**⚠️ ALWAYS run validation before starting the server!**
+// Add to your existing chat route
+app.post('/api/chat/send',
+  piiMiddleware.checkTextMessage,  // ← Add this line
+  async (req, res) => {
+    const { message, senderId, flagged, detection } = req.body;
+
+    if (flagged) {
+      console.log('⚠️ PII detected!', detection);
+      // Handle accordingly (save to admin panel, etc.)
+    }
+
+    // Your existing logic...
+    res.json({ success: true });
+  }
+);
+```
+
+### That's it! You're done! ✨
+
+---
+
+## 📁 Project Structure
+
+```
+pii-detection-system/
+│
+├── src/                                    # TypeScript source code
+│   ├── types/
+│   │   └── index.ts                       # All type definitions
+│   │
+│   ├── services/
+│   │   └── PIIDetectionService.ts         # Core PII detection logic
+│   │
+│   ├── middleware/
+│   │   └── ChatPIIMiddleware.ts           # Express middleware
+│   │
+│   ├── index.ts                           # Main export (import everything)
+│   └── server.ts                          # Example standalone server
+│
+├── Configuration
+│   ├── package.json                       # Dependencies & scripts
+│   ├── tsconfig.json                      # TypeScript configuration
+│   ├── .env.example                       # Environment variables template
+│   └── .gitignore                         # Git ignore rules
+│
+├── Testing Tools
+│   ├── test-all.bat                       # Automated test script (Windows)
+│   ├── test-ui.html                       # Interactive web test UI
+│   └── TEST_LOCALLY.md                    # Local testing guide
+│
+└── Documentation
+    ├── README.md                          # This file
+    ├── DEPLOYMENT.md                      # Deployment guide
+    └── EXAMPLE_INTEGRATION.ts             # Complete before/after example
+```
+
+### Old JavaScript Files Removed ✅
+
+- ❌ `server.js` → ✅ `src/server.ts`
+- ❌ `pii-detection-service.js` → ✅ `src/services/PIIDetectionService.ts`
+- ❌ `chat-pii-middleware.js` → ✅ `src/middleware/ChatPIIMiddleware.ts`
+- ❌ `test-detection.js`, `validate-setup.js` (removed)
+
+---
+
+## 📦 Files to Copy
+
+### Essential Files (Must Copy)
+
+Copy these 4 files to your project:
+
+```
+src/
+├── types/index.ts                  ← Type definitions (3KB)
+├── services/PIIDetectionService.ts ← Core service (15KB)
+├── middleware/ChatPIIMiddleware.ts ← Express middleware (7KB)
+└── index.ts                        ← Main export (0.2KB)
+
+Total: ~25KB
+```
+
+### Copy Commands (Windows)
 
 ```bash
-npm run validate
+# Create directory structure
+mkdir src\pii\types src\pii\services src\pii\middleware
+
+# Copy files
+copy pii-detection-system\src\types\index.ts src\pii\types\
+copy pii-detection-system\src\services\PIIDetectionService.ts src\pii\services\
+copy pii-detection-system\src\middleware\ChatPIIMiddleware.ts src\pii\middleware\
+copy pii-detection-system\src\index.ts src\pii\
 ```
 
-**What it checks:**
+### After Copying
 
-* ✅ `.env` file exists
-* ✅ API keys are valid format
-* ✅ Dependencies installed
-* ✅ Required files present
-
-**Expected Output:**
+Your project structure:
 
 ```
-✅ .env file exists
-✅ GEMINI_API_KEY_1 configured (AIzaSyC...)
-✅ GEMINI_API_KEY_2 configured (AIzaSyD...)
-✅ Found 2 valid API key(s)
-✅ All checks passed!
-
-🚀 Ready to start:
-   - Start server: npm start
-   - Run tests: npm test
+your-mobile-app-server/
+├── src/
+│   ├── pii/                    # PII detection module
+│   │   ├── types/index.ts
+│   │   ├── services/PIIDetectionService.ts
+│   │   ├── middleware/ChatPIIMiddleware.ts
+│   │   └── index.ts
+│   │
+│   ├── controllers/            # Your existing code
+│   ├── models/                 # Your existing code
+│   ├── routes/                 # Your existing code
+│   └── server.ts               # Your main server (updated)
+│
+├── .env                        # Add Gemini API keys here
+├── package.json                # Add dependencies
+└── tsconfig.json               # Your existing config
 ```
 
-### Step 5: Start the Server
+---
+
+## 💡 Integration Examples
+
+### Example 1: Basic Text Check
+
+```typescript
+const detection = await piiService.detectPIIInText(
+  "Call me at 555-1234",
+  "user123"
+);
+
+console.log(detection.hasPII);      // true
+console.log(detection.riskLevel);   // "high"
+console.log(detection.confidence);  // 95
+```
+
+### Example 2: Express Middleware
+
+**Before (your original code):**
+
+```typescript
+app.post('/api/messages', async (req, res) => {
+  const { text, userId, recipientId } = req.body;
+  await db.messages.create({ text, userId, recipientId });
+  res.json({ success: true });
+});
+```
+
+**After (with PII detection):**
+
+```typescript
+app.post('/api/messages',
+  piiMiddleware.checkTextMessage,  // ← Add this line
+  async (req, res) => {
+    const { message, senderId, receiverId, flagged, detection } = req.body;
+
+    // Save message to database
+    await db.messages.create({
+      text: message,
+      userId: senderId,
+      recipientId: receiverId,
+      flagged,  // ← PII detected flag
+      detection: flagged ? detection : null
+    });
+
+    if (flagged) {
+      // Handle flagged message
+      console.log('PII detected:', detection.riskLevel);
+    }
+
+    res.json({ success: true });
+  }
+);
+```
+
+### Example 3: Image Detection
+
+```typescript
+app.post('/api/chat/send-image',
+  upload.single('image'),
+  piiMiddleware.checkImageMessage,
+  async (req, res) => {
+    const { senderId, receiverId, flagged, detection } = req.body;
+    const imageFile = req.file;
+
+    if (flagged) {
+      console.log('PII in image:', detection);
+    }
+
+    res.json({ success: true });
+  }
+);
+```
+
+### Example 4: Client-Side Validation API
+
+```typescript
+// Server endpoint for mobile app validation
+app.post('/api/check-pii', async (req, res) => {
+  const { text, userId } = req.body;
+  const detection = await piiService.detectPIIInText(text, userId);
+
+  res.json({
+    canSend: !detection.hasPII,
+    message: detection.hasPII
+      ? 'Message contains personal information and cannot be sent.'
+      : 'Message is safe to send.'
+  });
+});
+```
+
+```typescript
+// React Native client
+async function sendMessage(text: string) {
+  const piiCheck = await fetch('https://api.yourapp.com/api/check-pii', {
+    method: 'POST',
+    body: JSON.stringify({ text, userId: currentUserId })
+  }).then(r => r.json());
+
+  if (!piiCheck.canSend) {
+    Alert.alert('Cannot Send', piiCheck.message);
+    return;
+  }
+
+  // Send message
+  await sendToServer(text);
+}
+```
+
+### Example 5: Background Processing
+
+```typescript
+// Check messages asynchronously
+app.post('/api/messages', async (req, res) => {
+  const { text, userId } = req.body;
+
+  // Save message immediately
+  const msg = await db.messages.create({ text, userId });
+
+  // Check PII in background
+  piiService.detectPIIInText(text, userId)
+    .then(detection => {
+      if (detection.hasPII) {
+        db.messages.update(msg.id, { flagged: true });
+      }
+    });
+
+  res.json({ success: true, id: msg.id });
+});
+```
+
+---
+
+## 📖 API Reference
+
+### PIIDetectionService
+
+```typescript
+class PIIDetectionService {
+  constructor(
+    apiKeys: string[],
+    config?: PIIDetectionConfig
+  );
+
+  detectPIIInText(
+    text: string,
+    userId: string,
+    metadata?: Record<string, any>
+  ): Promise<DetectionResult>;
+
+  detectPIIInImage(
+    imageData: ImageData | string,
+    userId: string,
+    metadata?: Record<string, any>
+  ): Promise<DetectionResult>;
+
+  getUsageStats(): UsageStatsResponse[];
+}
+```
+
+### ChatPIIMiddleware
+
+```typescript
+class ChatPIIMiddleware {
+  constructor(piiService: PIIDetectionService);
+
+  checkTextMessage: RequestHandler;
+  checkImageMessage: RequestHandler;
+
+  updateConfig(config: Partial<ChatMiddlewareConfig>): void;
+}
+```
+
+### Type Definitions
+
+```typescript
+interface DetectionResult {
+  hasPII: boolean;
+  confidence: number;
+  detectedItems: DetectedItem[];
+  reasoning: string;
+  riskLevel: 'critical' | 'high' | 'medium' | 'low';
+}
+
+interface DetectedItem {
+  type: 'phone' | 'email' | 'social' | 'messaging' | 'other';
+  value?: string;
+  severity: 'high' | 'medium' | 'low';
+}
+```
+
+**All types available in:** `src/types/index.ts`
+
+---
+
+## ⚙️ Configuration Options
+
+### PIIDetectionService Config
+
+```typescript
+{
+  model: 'gemini-2.5-flash',           // Gemini model to use
+  maxRetries: 3,                        // Max retry attempts
+  retryDelay: 1000,                     // Delay between retries (ms)
+  enableLogging: true,                  // Enable console logs
+  databaseUrl: 'postgres://...',        // Database connection (optional)
+  adminWebhook: 'https://...'           // Webhook for alerts (optional)
+}
+```
+
+### ChatPIIMiddleware Config
+
+```typescript
+{
+  blockOnDetection: false,     // Block messages with PII
+  forwardToReceiver: true,     // Forward flagged messages
+  saveOriginalMessage: true    // Save original content
+}
+```
+
+**Update config:**
+
+```typescript
+piiMiddleware.updateConfig({
+  blockOnDetection: true  // Will return 403 if PII detected
+});
+```
+
+---
+
+## 🔍 What Gets Detected?
+
+The service detects ALL forms of contact information:
+
+### Phone Numbers
+- **Standard**: `555-1234`, `(555) 123-4567`, `+1-555-123-4567`
+- **Obfuscated**: `5 5 5-1 2 3 4`, `five five five one two three four`
+- **Leetspeak**: `5five5-1234`, `ph0ne: 555one234`
+- **Spelled out**: `"my number is five five five twelve thirty four"`
+- **With spaces/dots**: `5.5.5.1.2.3.4`, `555 123 4567`
+
+### Email Addresses
+- **Standard**: `user@domain.com`, `user.name@company.co.uk`
+- **Obfuscated**: `user[at]domain[dot]com`, `user AT domain DOT com`
+- **Leetspeak**: `us3r@d0m4in.c0m`
+- **Spelled out**: `"email me at user at domain dot com"`
+- **Hidden**: `user (at) domain (dot) com`
+
+### Social Media
+- **Handles**: `@username`, `insta: username`, `snap: username`
+- **Links**: `Find me on [platform] as [username]`
+
+### Messaging Apps
+- WhatsApp numbers, Telegram usernames, Discord IDs
+- Signal numbers, WeChat IDs
+
+### Other Contact Methods
+- Skype IDs, Zoom meeting links
+- Physical addresses
+- Website URLs meant for contact
+
+### Creative Evasion Techniques
+- Unicode confusables (а vs a, е vs e)
+- Character insertion (c-o-n-t-a-c-t)
+- Emoji encoding
+- Coded language or hints
+- QR codes (in images)
+- Screenshots of messaging apps (in images)
+
+---
+
+## 🚀 Advanced Usage
+
+### Custom Detection Handler
+
+```typescript
+class CustomPIIService extends PIIDetectionService {
+  async saveToDatabase(detectionData: DetectionData): Promise<void> {
+    await db.piiDetections.insert({
+      userId: detectionData.userId,
+      type: detectionData.type,
+      detectedAt: detectionData.timestamp,
+      riskLevel: detectionData.detection.riskLevel
+    });
+  }
+
+  async notifyAdmin(detectionData: DetectionData): Promise<void> {
+    await sendSlackAlert({
+      channel: '#security-alerts',
+      message: `PII detected from user ${detectionData.userId}`
+    });
+  }
+}
+```
+
+### Batch Checking
+
+```typescript
+async function checkMultipleMessages(messages: string[], userId: string) {
+  const results = await Promise.all(
+    messages.map(msg => piiService.detectPIIInText(msg, userId))
+  );
+
+  return results.map((detection, idx) => ({
+    message: messages[idx],
+    hasPII: detection.hasPII,
+    riskLevel: detection.riskLevel
+  }));
+}
+```
+
+### Real-time Chat with WebSocket
+
+```typescript
+app.post('/api/chat/send', chatMiddleware.checkTextMessage, async (req, res) => {
+  const { message, senderId, receiverId, flagged, detection } = req.body;
+
+  const msg = await db.messages.create({
+    content: message,
+    senderId,
+    receiverId,
+    flagged
+  });
+
+  // Notify recipient via WebSocket if message is not flagged
+  if (!flagged || chatMiddleware.config.forwardToReceiver) {
+    io.to(receiverId).emit('new-message', msg);
+  }
+
+  // Alert admin if high risk
+  if (flagged && detection.riskLevel === 'critical') {
+    await notifyAdmin({ userId: senderId, message, detection });
+  }
+
+  res.json({ success: true, messageId: msg.id });
+});
+```
+
+---
+
+## 🧪 Testing Locally (Before Integration)
+
+### Quick Setup for Testing
+
+**Important:** Test the system standalone before integrating into your mobile app.
+
+#### Step 1: Setup Environment
 
 ```bash
-# Production mode
-npm start
+# 1. Copy environment file
+copy .env.example .env
 
-# Development mode (auto-reload on changes)
+# 2. Edit .env and add your Gemini API keys
+# GEMINI_API_KEY_1=your-actual-api-key-here
+# GEMINI_API_KEY_2=your-second-key-optional
+
+# 3. Install dependencies
+npm install
+
+# 4. Build TypeScript
+npm run build
+```
+
+#### Step 2: Start the Server
+
+```bash
+# Development mode (with auto-reload)
 npm run dev
 ```
 
-**Expected Output:**
-
+**Expected output:**
 ```
-[Config] Loaded GEMINI_API_KEY_1
-[Config] Loaded GEMINI_API_KEY_2
-[PII Detection] Service initialized with 2 valid API key(s)
 =====================================
 🚀 PII Detection Chat Server Started
 =====================================
@@ -247,1658 +590,397 @@ Mode: development
 =====================================
 ```
 
-### Step 6: Test the System
+### Testing Methods
+
+#### Method 1: Automated Tests (Easiest) ⭐
+
+Run the automated test suite:
 
 ```bash
-# Test text detection
-npm test
+test-all.bat
+```
 
-# Test image detection
-npm run test-image
+**Expected Results:**
+```
+[1/6] Testing Health Check...
+{"status":"ok","service":"PII Detection Chat Service",...}
 
-# Check API statistics
+[2/6] Testing PII Detection - Phone Number (should detect)...
+{"success":true,"detection":{"hasPII":true,"confidence":100,...}}
+
+[3/6] Testing PII Detection - Email (should detect)...
+{"success":true,"detection":{"hasPII":true,"confidence":100,...}}
+
+[4/6] Testing PII Detection - Clean Message (should NOT detect)...
+{"success":true,"detection":{"hasPII":false,...}}
+
+[5/6] Testing Send Message - With PII (should flag)...
+{"success":true,"message":"Message sent successfully","data":{"flagged":true,...}}
+
+[6/6] Testing API Stats...
+{"success":true,"totalKeys":2,"stats":[{"requests":4,"errors":0,...}]}
+```
+
+✅ **All tests should pass with:**
+- Health check returns "ok"
+- PII detected in phone/email tests
+- Clean messages NOT flagged
+- Messages with PII are flagged
+- API stats show request counts
+
+#### Method 2: Web UI (Visual Testing) 🎨
+
+1. **Start the server** (npm run dev)
+
+2. **Open test UI**:
+   - Double-click `test-ui.html` in your browser
+   - OR visit: `file:///C:/path/to/pii-detection-system/test-ui.html`
+
+3. **Test features**:
+   - ✅ Health Check - Verify server is running
+   - ⚡ Quick Tests - One-click testing for common PII types
+   - ✏️ Custom Test - Enter your own messages
+   - 💬 Send Message - Test full message flow
+   - 📊 API Stats - Monitor usage
+
+**Features:**
+- Real-time results with color coding
+- JSON response viewer
+- Pre-built test cases
+- Visual feedback (green = clean, red = PII detected)
+
+#### Method 3: Manual curl Commands
+
+```bash
+# Health Check
+curl http://localhost:3000/health
+
+# Test PII Detection - Phone Number
+curl -X POST http://localhost:3000/api/test/detect-pii ^
+  -H "Content-Type: application/json" ^
+  -d "{\"text\": \"Call me at 555-1234\", \"userId\": \"test-user\"}"
+
+# Test PII Detection - Email
+curl -X POST http://localhost:3000/api/test/detect-pii ^
+  -H "Content-Type: application/json" ^
+  -d "{\"text\": \"Email me at john@example.com\", \"userId\": \"test-user\"}"
+
+# Test Clean Message (should NOT detect)
+curl -X POST http://localhost:3000/api/test/detect-pii ^
+  -H "Content-Type: application/json" ^
+  -d "{\"text\": \"Hello, how are you?\", \"userId\": \"test-user\"}"
+
+# Send Message with PII
+curl -X POST http://localhost:3000/api/chat/send-message ^
+  -H "Content-Type: application/json" ^
+  -d "{\"message\": \"Contact me at 555-9999\", \"senderId\": \"user123\", \"receiverId\": \"user456\"}"
+
+# Check API Stats
 curl http://localhost:3000/api/stats
 ```
 
+### Test Cases to Try
+
+#### Phone Numbers
+```bash
+# Standard format
+"Call me at (555) 123-4567"
+
+# Obfuscated
+"My number is 5 5 5 - 1 2 3 4"
+
+# Spelled out
+"Call me at five five five one two three four"
+
+# Leetspeak
+"ph0ne: 555-1234"
+```
+
+#### Email Addresses
+```bash
+# Standard
+"Email me at user@domain.com"
+
+# Obfuscated
+"Contact me at user[at]domain[dot]com"
+
+# Spelled
+"Email me at user at domain dot com"
+```
+
+#### Social Media
+```bash
+# Instagram
+"Follow me on Instagram @username123"
+
+# Multiple platforms
+"Find me on insta: john_doe or snap: johndoe"
+```
+
+#### Clean Messages (Should NOT Detect)
+```bash
+"Hello! How are you doing today?"
+"I love this app! Great job on the design."
+"Can we meet tomorrow at 3 PM?"
+```
+
+### Success Criteria
+
+Your system is working correctly if:
+
+✅ Server starts without errors
+✅ Health check returns `"status": "ok"`
+✅ Phone numbers are detected with high confidence
+✅ Emails are detected with high confidence
+✅ Clean messages return `"hasPII": false`
+✅ Messages with PII are flagged
+✅ API stats show request counts
+✅ No false positives on normal conversation
+
+### Testing Documentation
+
+For detailed testing instructions, see:
+- **TEST_LOCALLY.md** - Complete testing guide
+- **test-all.bat** - Automated test script
+- **test-ui.html** - Interactive web interface
+
 ---
 
-## 🔌 API Endpoints
+## 🔧 Development Commands
 
-### Overview
+```bash
+# Install dependencies
+npm install
 
-Your backend now has these endpoints for integration:
+# Run development server
+npm run dev
 
-| Endpoint                        | Method | Purpose                              |
-| ------------------------------- | ------ | ------------------------------------ |
-| `/api/chat/send-message`      | POST   | Send text message with PII detection |
-| `/api/chat/send-image`        | POST   | Send image with PII detection        |
-| `/api/admin/flagged-messages` | GET    | Get all flagged messages             |
-| `/api/admin/review-message`   | POST   | Review and take action               |
-| `/api/test/detect-pii`        | POST   | Test detection directly              |
-| `/api/stats`                  | GET    | View API usage statistics            |
-| `/health`                     | GET    | Health check                         |
+# Build TypeScript
+npm run build
 
----
+# Type check (no build)
+npm run type-check
 
-### 1. Send Text Message
+# Run production build
+npm start
 
-**Endpoint:** `POST /api/chat/send-message`
-
-**Purpose:** Send a text message with automatic PII detection
-
-**Request:**
-
-```javascript
-// Content-Type: application/json
-
-{
-  "message": "Can we meet at the location?",
-  "senderId": "customer_123",
-  "receiverId": "technician_456",
-  "conversationId": "conv_789"
-}
-```
-
-**Response (Normal Message):**
-
-```javascript
-{
-  "success": true,
-  "message": "Message sent successfully",
-  "data": {
-    "messageId": "msg_1699887654321_abc123",
-    "flagged": false,
-    "timestamp": "2025-11-03T12:00:00Z"
-  }
-}
-```
-
-**Response (Flagged Message):**
-
-```javascript
-{
-  "success": true,
-  "message": "Message sent successfully",
-  "data": {
-    "messageId": "msg_1699887654321_abc123",
-    "flagged": true,
-    "timestamp": "2025-11-03T12:00:00Z"
-  }
-}
-```
-
-**Response (Blocked Message - if blocking enabled):**
-
-```javascript
-{
-  "success": false,
-  "error": "Message blocked: Contains contact information",
-  "message": "Please avoid sharing personal contact information in chat.",
-  "detection": {
-    "hasPII": true,
-    "riskLevel": "high"
-  }
-}
-```
-
-**Integration Example:**
-
-```javascript
-// Your existing chat function
-async function sendMessage(message, senderId, receiverId, conversationId) {
-  try {
-    const response = await axios.post('http://your-server.com/api/chat/send-message', {
-      message: message,
-      senderId: senderId,
-      receiverId: receiverId,
-      conversationId: conversationId
-    });
-
-    if (response.data.success) {
-      // Message sent successfully
-      const messageId = response.data.data.messageId;
-      const isFlagged = response.data.data.flagged;
-  
-      if (isFlagged) {
-        // Optional: Show warning to user
-        showWarning('Your message has been flagged for review');
-      }
-  
-      // Save to your database, update UI, etc.
-      return messageId;
-    }
-  } catch (error) {
-    if (error.response?.status === 403) {
-      // Message was blocked
-      showError(error.response.data.message);
-    } else {
-      // Other error
-      showError('Failed to send message');
-    }
-  }
-}
+# Clean build files
+npm run clean
 ```
 
 ---
 
-### 2. Send Image Message
+## 🛠️ Troubleshooting
 
-**Endpoint:** `POST /api/chat/send-image`
+### Server Won't Start
 
-**Purpose:** Send an image with automatic PII detection
+**Error:** `No valid Gemini API keys found`
+- **Solution:** Add valid API keys to `.env` file
+- Get keys from: https://aistudio.google.com/app/apikey
+- Ensure keys are longer than 20 characters
+- Remove placeholder text like "your-api-key-here"
 
-**Request:**
+**Error:** `Port 3000 already in use`
+- **Solution:** Change PORT in `.env` or kill the process:
+  ```bash
+  # Windows
+  netstat -ano | findstr :3000
+  taskkill /PID <PID> /F
 
-```javascript
-// Content-Type: multipart/form-data
+  # Or change port in .env
+  PORT=3001
+  ```
 
-const formData = new FormData();
-formData.append('image', imageFile);  // File object
-formData.append('senderId', 'customer_123');
-formData.append('receiverId', 'technician_456');
-formData.append('conversationId', 'conv_789');
-```
+### TypeScript Compilation Errors
 
-**Response (Normal Image):**
+**Error:** `Unable to compile TypeScript` or `TS6133`, `TS7030`
+- **Solution:** The code has been fixed for all TypeScript strict mode errors
+- Run `npm run build` to verify
+- If errors persist, check `tsconfig.json` settings
 
-```javascript
-{
-  "success": true,
-  "message": "Image sent successfully",
-  "data": {
-    "messageId": "msg_1699887654321_abc123",
-    "imageUrl": "https://your-storage.com/images/img_123.jpg",
-    "flagged": false,
-    "timestamp": "2025-11-03T12:00:00Z"
-  }
-}
-```
+**Error:** `Cannot find module 'ts-node'`
+- **Solution:**
+  ```bash
+  npm install --save-dev ts-node typescript
+  ```
 
-**Response (Flagged Image):**
+### "Cannot find module './pii'"
+- Check file path and imports
+- Ensure TypeScript is compiled: `npm run build`
+- Verify files are copied to correct location
+- Check that `src/index.ts` exports all modules
 
-```javascript
-{
-  "success": true,
-  "message": "Image sent successfully",
-  "data": {
-    "messageId": "msg_1699887654321_abc123",
-    "imageUrl": "https://your-storage.com/images/img_123.jpg",
-    "flagged": true,
-    "timestamp": "2025-11-03T12:00:00Z"
-  }
-}
-```
+### "All API keys are rate limited"
+- Add more API keys to `.env`
+- Wait 60 seconds for rate limit reset
+- Consider upgrading Gemini API tier
+- Free tier: 5 requests/minute per key
+- Add 3-5 keys for better rate limit handling
 
-**Integration Example (React Native):**
+### Types not recognized
+- Run: `npm install --save-dev @types/node @types/express`
+- Check `tsconfig.json` includes `"types": ["node"]`
+- Verify all dev dependencies are installed
 
-```javascript
-import * as ImagePicker from 'expo-image-picker';
-import axios from 'axios';
+### Middleware not working
+- Check middleware order in Express
+- Ensure `express.json()` is used before routes
+- Verify API keys are loaded correctly
+- Check console logs for middleware execution
 
-async function sendImageMessage(senderId, receiverId, conversationId) {
-  // Pick image
-  const result = await ImagePicker.launchImageLibraryAsync({
-    mediaTypes: ImagePicker.MediaTypeOptions.Images,
-    quality: 0.7,
-    allowsEditing: true
-  });
+### PII not being detected
+- Check API keys are valid and active
+- Enable logging: `enableLogging: true`
+- Test with `/api/test/detect-pii` endpoint
+- Verify Gemini API is accessible from your network
+- Check internet connection and firewall settings
 
-  if (!result.canceled) {
-    // Create FormData
-    const formData = new FormData();
-    formData.append('image', {
-      uri: result.assets[0].uri,
-      type: result.assets[0].mimeType || 'image/jpeg',
-      name: `image_${Date.now()}.jpg`
-    });
-    formData.append('senderId', senderId);
-    formData.append('receiverId', receiverId);
-    formData.append('conversationId', conversationId);
+### Test Failures
 
-    try {
-      const response = await axios.post(
-        'http://your-server.com/api/chat/send-image',
-        formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data'
-          }
-        }
-      );
+**test-all.bat fails:**
+- Ensure server is running: `npm run dev`
+- Check server is on port 3000
+- Verify curl is installed (Windows 10+ has it built-in)
 
-      if (response.data.success) {
-        const messageId = response.data.data.messageId;
-        const imageUrl = response.data.data.imageUrl;
-        const isFlagged = response.data.data.flagged;
-
-        if (isFlagged) {
-          Alert.alert(
-            'Image Flagged',
-            'Your image has been flagged as it may contain contact information.'
-          );
-        }
-
-        // Update UI, save to local state, etc.
-        return { messageId, imageUrl };
-      }
-    } catch (error) {
-      if (error.response?.status === 403) {
-        Alert.alert('Image Blocked', error.response.data.message);
-      } else {
-        Alert.alert('Error', 'Failed to send image');
-      }
-    }
-  }
-}
-```
-
-**Integration Example (React.js Web):**
-
-```javascript
-async function sendImageMessage(imageFile, senderId, receiverId, conversationId) {
-  const formData = new FormData();
-  formData.append('image', imageFile);
-  formData.append('senderId', senderId);
-  formData.append('receiverId', receiverId);
-  formData.append('conversationId', conversationId);
-
-  try {
-    const response = await fetch('http://your-server.com/api/chat/send-image', {
-      method: 'POST',
-      body: formData
-    });
-
-    const data = await response.json();
-
-    if (data.success) {
-      if (data.data.flagged) {
-        showToast('⚠️ Image flagged for review');
-      }
-      return data.data;
-    }
-  } catch (error) {
-    console.error('Failed to send image:', error);
-    throw error;
-  }
-}
-```
+**test-ui.html shows errors:**
+- Check browser console for CORS errors
+- Ensure server is running
+- Use modern browser (Chrome, Firefox, Edge)
+- Open browser DevTools (F12) to see detailed errors
 
 ---
 
-### 3. Get Flagged Messages (Admin)
+## ⚡ Performance & Best Practices
 
-**Endpoint:** `GET /api/admin/flagged-messages`
+### Performance
 
-**Purpose:** Retrieve all flagged messages for admin review
+- **Text Detection**: ~500ms - 2s (depends on Gemini API)
+- **Image Detection**: ~1s - 3s
+- **Auto Key Rotation**: <10ms
+- **Multiple API Keys**: Near-zero downtime
 
-**Query Parameters:**
+### Best Practices
 
-```
-?filter=all|pending|reviewed
-```
+1. **Multiple API Keys**: Use 3+ Gemini API keys for better rate limit handling
+   - Each free key = 5 requests/minute
+   - 5 keys = 25 requests/minute = 1,500 messages/hour
 
-**Response:**
-
-```javascript
-{
-  "success": true,
-  "data": {
-    "flaggedMessages": [
-      {
-        "id": "msg_123",
-        "type": "text",
-        "senderId": "customer_123",
-        "receiverId": "technician_456",
-        "content": "Call me at 555-1234",
-        "timestamp": "2025-11-03T12:00:00Z",
-        "reviewStatus": "pending",
-        "detection": {
-          "hasPII": true,
-          "confidence": 95,
-          "riskLevel": "high",
-          "detectedItems": [
-            {
-              "type": "phone",
-              "value": "555-1234",
-              "severity": "high"
-            }
-          ]
-        }
-      }
-    ],
-    "totalCount": 15
-  }
-}
-```
-
----
-
-### 4. Review Message (Admin)
-
-**Endpoint:** `POST /api/admin/review-message`
-
-**Purpose:** Take action on flagged message
-
-**Request:**
-
-```javascript
-{
-  "messageId": "msg_123",
-  "action": "approve|warn_user|delete_message|block_user",
-  "adminNotes": "False positive - street address"
-}
-```
-
-**Response:**
-
-```javascript
-{
-  "success": true,
-  "message": "Message reviewed successfully"
-}
-```
-
----
-
-### 5. Test Detection (Development)
-
-**Endpoint:** `POST /api/test/detect-pii`
-
-**Purpose:** Directly test PII detection without saving
-
-**Request:**
-
-```javascript
-{
-  "text": "Call me at 555-1234",
-  "userId": "test-user"
-}
-```
-
-**Response:**
-
-```javascript
-{
-  "success": true,
-  "detection": {
-    "hasPII": true,
-    "confidence": 95,
-    "riskLevel": "high",
-    "detectedItems": [
-      {
-        "type": "phone",
-        "value": "555-1234",
-        "obfuscationType": "none",
-        "location": "End of message",
-        "severity": "high"
-      }
-    ],
-    "reasoning": "Message contains a phone number in standard format"
-  }
-}
-```
-
----
-
-### 6. API Usage Statistics
-
-**Endpoint:** `GET /api/stats`
-
-**Purpose:** View API key usage and performance metrics
-
-**Response:**
-
-```javascript
-{
-  "success": true,
-  "totalKeys": 3,
-  "stats": [
-    {
-      "keyName": "GEMINI_API_KEY_1",
-      "keyIndex": 0,
-      "keyPreview": "AIzaSyC...",
-      "isCurrent": true,
-      "keyNumber": 1,
-      "requests": 145,
-      "errors": 2,
-      "lastUsed": "2025-11-03T12:00:00Z",
-      "rateLimitHits": 5
-    },
-    {
-      "keyName": "GEMINI_API_KEY_2",
-      "keyIndex": 1,
-      "keyPreview": "AIzaSyD...",
-      "isCurrent": false,
-      "keyNumber": 2,
-      "requests": 98,
-      "errors": 1,
-      "lastUsed": "2025-11-03T11:55:00Z",
-      "rateLimitHits": 3
-    }
-  ]
-}
-```
-
----
-
-### 7. Health Check
-
-**Endpoint:** `GET /health`
-
-**Purpose:** Check if server is running
-
-**Response:**
-
-```javascript
-{
-  "status": "ok",
-  "service": "PII Detection Chat Service",
-  "timestamp": "2025-11-03T12:00:00Z",
-  "apiKeysConfigured": 3
-}
-```
-
----
-
-## 🏗️ Code Architecture
-
-### Project Structure
-
-```
-pii-detection-system/
-├── server.js                    # Express server (main entry)
-├── pii-detection-service.js     # Core AI detection logic
-├── chat-pii-middleware.js       # Express middleware
-├── test-detection.js            # Text detection tests
-├── validate-setup.js            # Setup validation script
-├── package.json                 # Dependencies
-├── .env                         # Environment config (create this!)
-├── .env.example                 # Environment template
-├── .gitignore                   # Git ignore rules
-│
-├── README.md                    # This file
-├── DEPLOYMENT.md                # AWS deployment help (MLOPS)
-```
-
----
-
-### Core Components Explained
-
-#### 1. **pii-detection-service.js**
-
-**Purpose:** Core AI detection engine using Google Gemini API
-
-**Key Methods:**
-
-```javascript
-class PIIDetectionService {
-  constructor(apiKeys, config)
-  // Initialize service with API keys and configuration
-  
-  async detectPIIInText(text, userId, metadata)
-  // Analyze text for contact information
-  // Returns: { hasPII, confidence, detectedItems, riskLevel }
-  
-  async detectPIIInImage(imageData, userId, metadata)
-  // Analyze image for contact information
-  // Returns: { hasPII, confidence, detectedItems, riskLevel }
-  
-  rotateAPIKey()
-  // Switch to next available API key on rate limit
-  
-  getUsageStats()
-  // Get statistics for all API keys
-}
-```
-
-**How it Works:**
-
-1. **Initialization:**
-   ```javascript
-   const piiService = new PIIDetectionService([key1, key2, key3], {
-     model: 'gemini-2.0-flash-exp',
-     maxRetries: 3,
-     enableLogging: true
-   });
-   ```
-2. **Text Detection:**
-   * Takes text input
-   * Builds comprehensive prompt with detection rules
-   * Sends to Gemini AI
-   * Parses JSON response
-   * Returns detection result
-3. **Image Detection:**
-   * Takes base64 image data
-   * Builds image analysis prompt
-   * Sends image + prompt to Gemini Vision AI
-   * Extracts text from image (OCR)
-   * Detects contact information
-   * Returns detection result
-4. **Auto-Scaling:**
-   * Tracks usage per API key
-   * Detects rate limit errors (429)
-   * Automatically rotates to next available key
-   * Logs all rotations for monitoring
-
-**Detection Prompt Engineering:**
-
-The service uses advanced prompt engineering to catch:
-
-* Standard formats (555-1234, user@email.com)
-* Obfuscated formats (5 5 5-1234, user[at]email[dot]com)
-* Leetspeak (5five5-1234, em4il@d0m4in.c0m)
-* Spelled out ("five five five one two three four")
-* Creative evasion ("DM me", "text me", emojis)
-* Context clues ("share your contact privately")
-
----
-
-#### 2. **chat-pii-middleware.js**
-
-**Purpose:** Express middleware for seamless integration
-
-**Key Methods:**
-
-```javascript
-class ChatPIIMiddleware {
-  constructor(piiService)
-  // Initialize with PII detection service
-  
-  checkTextMessage(req, res, next)
-  // Middleware for text message endpoint
-  // Checks req.body.message for PII
-  
-  checkImageMessage(req, res, next)
-  // Middleware for image upload endpoint
-  // Checks uploaded image for PII
-  
-  updateConfig(newConfig)
-  // Update middleware configuration
-}
-```
-
-**How it Works:**
-
-1. **Text Middleware:**
-   ```javascript
-   app.post('/api/chat/send-message',
-     chatMiddleware.checkTextMessage,  // <- Middleware
-     (req, res) => {
-       // req.body.flagged - true if PII detected
-       // req.body.detection - full detection details
-       // req.piiDetection - raw detection object
-     }
-   );
-   ```
-2. **Image Middleware:**
-   ```javascript
-   app.post('/api/chat/send-image',
-     upload.single('image'),            // <- Multer first
-     chatMiddleware.checkImageMessage,  // <- Then PII check
-     (req, res) => {
-       // req.body.flagged - true if PII detected
-       // req.file - uploaded file info
-     }
-   );
-   ```
-3. **Configuration:**
-   ```javascript
-   chatMiddleware.updateConfig({
-     blockOnDetection: false,   // false = flag, true = block
-     forwardToReceiver: true,   // forward even if flagged
-     saveOriginalMessage: true  // save for admin review
-   });
-   ```
-
-**Middleware Flow:**
-
-```
-Request arrives
-     ↓
-Middleware executes
-     ↓
-Calls piiService.detectPII*()
-     ↓
-Gets detection result
-     ↓
-Adds to req.body:
-  - flagged: true/false
-  - flagReason: 'PII_DETECTED'
-  - detection: {...}
-     ↓
-If blockOnDetection = true and PII found:
-  - Return 403 error
-  - Don't call next()
-Else:
-  - Call next()
-  - Continue to route handler
-```
-
----
-
-#### 3. **server.js**
-
-**Purpose:** Express.js backend server with all endpoints
-
-**Key Sections:**
-
-1. **Configuration Loading:**
-   ```javascript
-   // Load API keys from environment
-   function loadAPIKeys() {
-     // Reads GEMINI_API_KEY_1, GEMINI_API_KEY_2, etc.
-     // Filters out placeholders
-     // Returns array of valid keys
+2. **Error Handling**: Don't block messages if PII check fails
+   ```typescript
+   try {
+     const detection = await piiService.detectPIIInText(text, userId);
+   } catch (error) {
+     console.error('PII check failed:', error);
+     // Continue without blocking
    }
    ```
-2. **Service Initialization:**
-   ```javascript
-   const piiService = new PIIDetectionService(apiKeys, config);
-   const chatMiddleware = new ChatPIIMiddleware(piiService);
-   ```
-3. **Route Handlers:**
-   * `/api/chat/send-message` - Text messages
-   * `/api/chat/send-image` - Image messages
-   * `/api/admin/*` - Admin endpoints
-   * `/api/test/*` - Testing endpoints
-4. **Error Handling:**
-   ```javascript
-   // Global error handler
-   app.use((err, req, res, next) => {
-     console.error('[Server Error]', err);
-     res.status(err.status || 500).json({
-       success: false,
-       error: err.message
-     });
-   });
-   ```
+
+3. **Logging**: Enable in development, consider disabling in production
+
+4. **Database**: Save PII detections for audit and review
+
+5. **Admin Review**: Implement admin panel to review flagged messages
+
+6. **User Feedback**: Inform users when messages are blocked/flagged
+
+7. **Privacy**: Don't log actual PII content, only detection metadata
+
+8. **Caching**: Consider caching detection results for duplicate messages
 
 ---
 
-#### 4. **Integration Components**
+## 📦 Dependencies
 
-##### ChatScreen.jsx (React Native)
-
-**What it does:**
-
-* Chat UI for mobile app
-* Image picker integration
-* Sends messages to backend
-* Handles flagged responses
-* Shows user warnings
-
-**Key Features:**
-
-```javascript
-// Send text message
-const sendTextMessage = async () => {
-  const response = await axios.post(API_URL + '/send-message', {
-    message: inputText,
-    senderId: userId,
-    receiverId: receiverId
-  });
-  
-  if (response.data.data.flagged) {
-    Alert.alert('Message Flagged', '...');
-  }
-};
-
-// Send image
-const pickAndSendImage = async () => {
-  const result = await ImagePicker.launchImageLibraryAsync({...});
-  
-  const formData = new FormData();
-  formData.append('image', {...});
-  
-  const response = await axios.post(API_URL + '/send-image', formData);
-};
-```
-
-##### AdminDashboard.jsx (React.js)
-
-**What it does:**
-
-* Admin panel for reviewing flagged content
-* Statistics display
-* Message review interface
-* Action buttons (approve/block/delete)
-
-**Key Features:**
-
-```javascript
-// Load flagged messages
-const loadFlaggedMessages = async () => {
-  const response = await axios.get(API_URL + '/admin/flagged-messages');
-  setFlaggedMessages(response.data.data.flaggedMessages);
-};
-
-// Review message
-const handleReview = async (messageId, action, notes) => {
-  await axios.post(API_URL + '/admin/review-message', {
-    messageId, action, adminNotes: notes
-  });
-};
-```
-
----
-
-## 🔗 Integration Guide
-
-### Step 1: Update Backend URLs
-
-In your frontend code, update the API base URL:
-
-```javascript
-// For React Native (ChatScreen.jsx)
-const API_BASE_URL = 'http://your-server.com/api';  // Replace this!
-
-// For React.js Admin (AdminDashboard.jsx)
-const API_BASE_URL = 'http://your-server.com/api';  // Replace this!
-```
+**Runtime (only 1 dependency):**
+- `@google/generative-ai` - Gemini AI SDK
 
 **Development:**
+- `typescript` - TypeScript compiler
+- `@types/express` - Express types
+- `@types/cors` - CORS types
+- `@types/multer` - Multer types
+- `@types/node` - Node.js types
+- `ts-node` - Run TypeScript directly
+- `nodemon` - Auto-restart on changes
+- `rimraf` - Clean build folder
 
-```javascript
-const API_BASE_URL = 'http://localhost:3000/api';
-```
+---
 
-**Production:**
+## ✨ Why TypeScript?
 
-```javascript
-const API_BASE_URL = 'https://api.yourapp.com/api';
+- ✅ **Type Safety** - Catch errors at compile time
+- ✅ **IntelliSense** - Auto-completion in VS Code
+- ✅ **Better Refactoring** - Easier to maintain and update
+- ✅ **Self-Documenting** - Types serve as inline documentation
+- ✅ **Less Bugs** - TypeScript catches common errors
+- ✅ **Modern** - Uses latest TypeScript features
+- ✅ **Compatible** - Works with existing TypeScript projects
+
+---
+
+## 📊 Usage Stats
+
+Monitor API usage:
+
+```typescript
+const stats = piiService.getUsageStats();
+console.log(stats);
+// [
+//   {
+//     keyIndex: 0,
+//     keyPreview: "AIzaSyC1...",
+//     isCurrent: true,
+//     requests: 150,
+//     errors: 2,
+//     rateLimitHits: 1
+//   }
+// ]
 ```
 
 ---
 
-### Step 2: Replace Existing Chat Endpoints
+## 🔐 Security & Privacy
 
-**Before (Your old code):**
-
-```javascript
-app.post('/api/chat/send-message', async (req, res) => {
-  // Your existing message handling
-  const { message, senderId, receiverId } = req.body;
-  
-  // Save to database
-  await db.messages.insert({...});
-  
-  res.json({ success: true });
-});
-```
-
-**After (With PII detection):**
-
-```javascript
-app.post('/api/chat/send-message',
-  chatMiddleware.checkTextMessage,  // Add this middleware
-  async (req, res) => {
-    const { message, senderId, receiverId, flagged, detection } = req.body;
-  
-    // Save to database
-    const messageData = {
-      message,
-      senderId,
-      receiverId,
-      flagged: flagged || false,
-      detection: detection || null,
-      timestamp: new Date()
-    };
-  
-    await db.messages.insert(messageData);
-  
-    // If flagged, save to admin review queue
-    if (flagged) {
-      await db.flaggedMessages.insert({
-        ...messageData,
-        reviewStatus: 'pending',
-        flaggedAt: new Date()
-      });
-    }
-  
-    res.json({
-      success: true,
-      data: {
-        messageId: messageData.id,
-        flagged: flagged
-      }
-    });
-  }
-);
-```
+- PII detection happens server-side
+- Original messages can be saved or discarded (configurable)
+- Detection metadata is logged (not actual PII content)
+- Admin notifications via webhook (optional)
+- Database storage for audit trail (optional)
 
 ---
 
-### Step 3: Add Image Endpoint
+## 📄 License
 
-**If you don't have image support yet:**
+MIT
 
-```javascript
-const multer = require('multer');
+## 🙏 Credits
 
-// Configure multer
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
-      cb(null, true);
-    } else {
-      cb(new Error('Only images allowed'));
-    }
-  }
-});
-
-// Image upload endpoint
-app.post('/api/chat/send-image',
-  upload.single('image'),
-  chatMiddleware.checkImageMessage,
-  async (req, res) => {
-    const { senderId, receiverId, flagged, detection } = req.body;
-    const imageFile = req.file;
-  
-    // Upload to your storage (S3, Cloudinary, etc.)
-    const imageUrl = await uploadToStorage(imageFile.buffer);
-  
-    // Save to database
-    const messageData = {
-      type: 'image',
-      imageUrl,
-      senderId,
-      receiverId,
-      flagged: flagged || false,
-      detection: detection || null,
-      timestamp: new Date()
-    };
-  
-    await db.messages.insert(messageData);
-  
-    if (flagged) {
-      await db.flaggedMessages.insert({
-        ...messageData,
-        reviewStatus: 'pending'
-      });
-    }
-  
-    res.json({
-      success: true,
-      data: {
-        messageId: messageData.id,
-        imageUrl: imageUrl,
-        flagged: flagged
-      }
-    });
-  }
-);
-```
+Built with:
+- **Google Gemini AI** - AI-powered detection
+- **Express.js** - Web framework
+- **TypeScript** - Type-safe JavaScript
+- **Node.js** - Runtime environment
 
 ---
 
-### Step 4: Update Frontend to Handle Flags
+## 🆘 Support
 
-**React Native - Add Warning Alert:**
-
-```javascript
-// In your sendMessage function
-if (response.data.data.flagged) {
-  Alert.alert(
-    'Message Flagged',
-    'Your message has been flagged for review as it may contain contact information.',
-    [{ text: 'OK' }]
-  );
-}
-```
-
-**React.js - Add Toast Notification:**
-
-```javascript
-// In your sendMessage function
-if (response.data.data.flagged) {
-  toast.warning('⚠️ Message flagged for review');
-}
-```
+For issues or questions:
+1. Check this README
+2. Review `EXAMPLE_INTEGRATION.ts` for complete example
+3. Check `src/server.ts` for working example
+4. Test with `/api/test/detect-pii` endpoint
 
 ---
 
-### Step 5: Add Admin Dashboard (Optional)
+## 🎉 Ready to Go!
 
-1. **Copy admin components:**
-   ```bash
-   cp AdminDashboard.jsx src/components/
-   cp AdminDashboard.css src/components/
-   ```
-2. **Add route:**
-   ```javascript
-   import AdminDashboard from './components/AdminDashboard';
+**You now have a production-ready PII detection system!**
 
-   <Route path="/admin" component={AdminDashboard} />
-   ```
-3. **Update API URL in AdminDashboard.jsx:**
-   ```javascript
-   const API_BASE_URL = 'http://your-server.com/api';
-   ```
+- 📁 **Only 4 files** to copy (~25KB)
+- ⏱️ **5 minutes** to integrate
+- 🔑 **1 runtime dependency**
+- ✅ **100% TypeScript**
+- 🚀 **Production ready**
 
----
-
-## 🧪 Testing
-
-### 1. Validate Setup
-
-**Always run before starting:**
-
-```bash
-npm run validate
-```
-
-This checks:
-
-* ✅ .env file exists
-* ✅ API keys valid
-* ✅ Dependencies installed
-* ✅ Files present
-
----
-
-### 2. Test Text Detection
-
-```bash
-# Run full test suite (25+ test cases)
-npm test
-```
-
-**Expected output:**
-
-```
-🧪 PII DETECTION TEST SUITE
-============================================================
-
-📝 Test 1/25: Standard Phone Number
-   Input: "Call me at 555-123-4567"
-   Expected: DETECT PII
-   ✅ PASSED
-   📊 Confidence: 95%
-   ⚠️  Risk Level: high
-   🔍 Items: 1
-      1. phone: 555-123-4567
-...
-
-📊 TEST SUMMARY
-Total Tests: 25
-✅ Passed: 23
-❌ Failed: 2
-Success Rate: 92.00%
-```
-
----
-
-### 3. Test Image Detection
-
-```bash
-# Run image detection demo
-npm run test-image
-```
-
-**Or test with your own image:**
-
-```bash
-# 1. Place test image
-cp /path/to/business-card.jpg ./test-image.jpg
-
-# 2. Run test
-node test-image-detection.js
-```
-
----
-
-### 4. Test via API
-
-**Text detection:**
-
-```bash
-curl -X POST http://localhost:3000/api/test/detect-pii \
-  -H "Content-Type: application/json" \
-  -d '{
-    "text": "Call me at 555-1234",
-    "userId": "test-user"
-  }'
-```
-
-**Image detection:**
-
-```bash
-curl -X POST http://localhost:3000/api/chat/send-image \
-  -F "image=@./test-image.jpg" \
-  -F "senderId=test-user" \
-  -F "receiverId=receiver-id" \
-  -F "conversationId=conv-123"
-```
-
-**Check statistics:**
-
-```bash
-curl http://localhost:3000/api/stats
-```
-
----
-
-### 5. Test Cases Included
-
-The test suite covers:
-
-**Text Detection:**
-
-* ✅ Standard formats (555-1234, user@email.com)
-* ✅ Obfuscated (5 5 5-1234, user[at]email[dot]com)
-* ✅ Leetspeak (5five5-1234, em4il@d0m4in.c0m)
-* ✅ Spelled out (five five five one two three four)
-* ✅ Social media (@username, insta: john)
-* ✅ Messaging apps (WhatsApp: 555-1234)
-* ✅ Creative evasion (DM me, text me)
-* ✅ Safe messages (should NOT detect)
-
-**Image Detection:**
-
-* ✅ Business cards
-* ✅ Screenshots
-* ✅ Handwritten notes
-* ✅ QR codes
-* ✅ Signs/posters
-* ✅ Safe images (no PII)
-
----
-
-## ⚙️ Configuration
-
-### Environment Variables
-
-```env
-# Server Configuration
-PORT=3000
-NODE_ENV=development|production
-
-# Gemini API Keys (REQUIRED)
-GEMINI_API_KEY_1=your-key-1
-GEMINI_API_KEY_2=your-key-2
-GEMINI_API_KEY_3=your-key-3
-# Add as many as needed
-
-# Database (Optional - for saving flagged messages)
-DATABASE_URL=mongodb://localhost:27017/chat-app
-# Or PostgreSQL:
-# DATABASE_URL=postgresql://user:pass@localhost:5432/chat-app
-
-# Admin Webhooks (Optional - for notifications)
-ADMIN_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
-```
-
----
-
-### Middleware Configuration
-
-```javascript
-// In server.js, after initializing middleware
-
-chatMiddleware.updateConfig({
-  // Block messages vs flag only
-  blockOnDetection: false,     // false = flag + forward (recommended)
-                               // true = block completely
-  
-  // Forward to receiver even if flagged
-  forwardToReceiver: true,     // true = forward anyway (recommended)
-                               // false = hold for admin review
-  
-  // Save original message content
-  saveOriginalMessage: true    // true = save for review
-                               // false = discard
-});
-```
-
-**Recommended Settings:**
-
-**For MVP/Testing:**
-
-```javascript
-{
-  blockOnDetection: false,   // Don't block, just flag
-  forwardToReceiver: true,   // Forward normally
-  saveOriginalMessage: true  // Save for review
-}
-```
-
-**For Production (Strict):**
-
-```javascript
-{
-  blockOnDetection: true,    // Block messages with PII
-  forwardToReceiver: false,  // Don't forward flagged messages
-  saveOriginalMessage: true  // Save for evidence
-}
-```
-
----
-
-### Service Configuration
-
-```javascript
-// In server.js, when initializing PIIDetectionService
-
-const piiService = new PIIDetectionService(apiKeys, {
-  // AI Model to use
-  model: 'gemini-2.0-flash-exp',  // Fastest, best for MVP
-  
-  // Retry configuration
-  maxRetries: 3,                   // Retry attempts on error
-  retryDelay: 1000,                // Initial delay (ms)
-  
-  // Logging
-  enableLogging: true,             // Console logs
-  
-  // Database (optional)
-  databaseUrl: process.env.DATABASE_URL,
-  
-  // Webhooks (optional)
-  adminWebhook: process.env.ADMIN_WEBHOOK_URL
-});
-```
-
----
-
-### Rate Limits
-
-| Tier           | Per Key      | Combined (5 keys) | Good For    |
-| -------------- | ------------ | ----------------- | ----------- |
-| **Free** | 5 req/min    | 25 req/min        | MVP Testing |
-|                |              | 1,500 msg/hour    |             |
-| **Paid** | 1000 req/min | 5000 req/min      | Production  |
-|                |              | 300,000 msg/hour  |             |
-
-**Cost (Paid Tier):**
-
-* $0.075 per 1M input tokens
-* ~$0.00001 per message
-* ~$0.01 per 1,000 messages
-
----
-
-## 🔧 Troubleshooting
-
-### Common Issues
-
-#### 1. "No valid API keys found"
-
-**Problem:** `.env` file missing or has placeholder keys
-
-**Solution:**
-
-```bash
-# Check .env exists
-ls -la .env
-
-# Check contents
-cat .env
-
-# If missing, create from example
-cp .env.example .env
-
-# Add real API keys from:
-# https://aistudio.google.com/app/apikey
-```
-
----
-
-#### 2. "API key not valid"
-
-**Problem:** API key is expired, revoked, or incorrect format
-
-**Solution:**
-
-```bash
-# 1. Visit Google AI Studio
-# https://aistudio.google.com/app/apikey
-
-# 2. Check if your keys are listed and active
-
-# 3. Create new keys if needed
-
-# 4. Update .env with new keys
-GEMINI_API_KEY_1=AIzaSy_new_key_here
-
-# 5. Restart server
-npm start
-```
-
----
-
-#### 3. "Switched from key 0 to key 0"
-
-**Problem:** Only 1 API key configured
-
-**Solution:**
-
-```bash
-# Add more keys to .env
-GEMINI_API_KEY_2=your-second-key
-GEMINI_API_KEY_3=your-third-key
-
-# Restart server
-npm start
-```
-
-**Note:** This warning won't break functionality, but limits scalability.
-
----
-
-#### 4. "All API keys are rate limited"
-
-**Problem:** Hit rate limits on all configured keys
-
-**Solutions:**
-
-**Short-term:**
-
-```bash
-# Wait 60 seconds for reset
-sleep 60
-
-# Retry request
-```
-
-**Long-term:**
-
-```bash
-# Add more API keys
-GEMINI_API_KEY_4=another-key
-GEMINI_API_KEY_5=another-key
-
-# Or upgrade to paid tier:
-# https://ai.google.dev/gemini-api/docs/pricing
-```
-
----
-
-#### 5. Image upload fails
-
-**Problem:** Image too large or wrong format
-
-**Solution:**
-
-```javascript
-// Check image size
-console.log('Image size:', imageFile.size / 1024 / 1024, 'MB');
-
-// Resize before upload (React Native)
-import * as ImageManipulator from 'expo-image-manipulator';
-
-const resized = await ImageManipulator.manipulateAsync(
-  image.uri,
-  [{ resize: { width: 1280 } }],
-  { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
-);
-```
-
-**Supported formats:**
-
-* ✅ JPEG/JPG
-* ✅ PNG
-* ✅ WEBP
-* ✅ GIF
-* ✅ BMP
-* ✅ HEIC
-
-**Max size:** 10MB (configured in server.js)
-
----
-
-#### 6. Detection not working
-
-**Problem:** AI not detecting obvious PII
-
-**Check:**
-
-1. **API keys valid:**
-   ```bash
-   npm run validate
-   ```
-2. **Model correct:**
-   ```javascript
-   // In server.js
-   model: 'gemini-2.0-flash-exp'  // Check this
-   ```
-3. **Test directly:**
-   ```bash
-   curl -X POST http://localhost:3000/api/test/detect-pii \
-     -H "Content-Type: application/json" \
-     -d '{"text": "Call 555-1234", "userId": "test"}'
-   ```
-4. **Check logs:**
-   ```bash
-   # Look for errors in console
-   [PII Detection Error] ...
-   ```
-
----
-
-#### 7. Server won't start
-
-**Problem:** Port in use or missing dependencies
-
-**Solutions:**
-
-```bash
-# Check if port 3000 in use
-lsof -i :3000
-
-# Kill process using port
-kill -9 <PID>
-
-# Or use different port
-PORT=3001 npm start
-
-# Reinstall dependencies
-rm -rf node_modules package-lock.json
-npm install
-npm start
-```
-
----
-
-### Debug Mode
-
-Enable detailed logging:
-
-```javascript
-// In server.js
-const piiService = new PIIDetectionService(apiKeys, {
-  enableLogging: true,  // Enable console logs
-  ...
-});
-```
-
-**Logs to watch:**
-
-```
-[Config] Loaded GEMINI_API_KEY_1
-[PII Detection] Service initialized with N keys
-[API Call] Using GEMINI_API_KEY_1 (Attempt 1/3)
-[Rate Limit] GEMINI_API_KEY_1 hit rate limit
-[API Key Rotation] Switched from KEY_1 to KEY_2
-[PII DETECTED] { userId: ..., riskLevel: ... }
-```
-
----
-
-### Get Help
-
-1. **Run validation:**
-   ```bash
-   npm run validate
-   ```
-2. **Check setup guide:**
-   ```bash
-   cat SETUP_GUIDE.md
-   ```
-3. **Test components:**
-   ```bash
-   npm test
-   npm run test-image
-   ```
-4. **Check API stats:**
-   ```bash
-   curl http://localhost:3000/api/stats
-   ```
-
----
-
-## 🚀 Production Deployment
-
-### Pre-Deployment Checklist
-
-* [ ] **API Keys:** Upgrade to paid tier for production
-* [ ] **Environment:** Set `NODE_ENV=production`
-* [ ] **Database:** Configure MongoDB/PostgreSQL
-* [ ] **Storage:** Set up S3/Cloudinary for images
-* [ ] **Monitoring:** Add error tracking (Sentry, etc.)
-* [ ] **Rate Limits:** Configure based on traffic
-* [ ] **Webhooks:** Set up admin notifications
-* [ ] **SSL/TLS:** Enable HTTPS
-* [ ] **Load Testing:** Test with expected traffic
-* [ ] **Backup:** Database backup strategy
-
----
-
-### AWS Deployment
-
-See `DEPLOYMENT.md` for complete AWS deployment guide.
-
-**Quick Deploy to AWS Elastic Beanstalk:**
-
-```bash
-# Install EB CLI
-pip install awsebcli
-
-# Initialize
-eb init -p node.js pii-detection-service
-
-# Create environment
-eb create production-env
-
-# Set environment variables
-eb setenv \
-  GEMINI_API_KEY_1=your-key-1 \
-  GEMINI_API_KEY_2=your-key-2 \
-  DATABASE_URL=your-mongodb-url
-
-# Deploy
-eb deploy
-
-# Open application
-eb open
-```
-
----
-
-### Environment Variables for Production
-
-```env
-NODE_ENV=production
-PORT=3000
-
-# Paid tier API keys (multiple for redundancy)
-GEMINI_API_KEY_1=your-production-key-1
-GEMINI_API_KEY_2=your-production-key-2
-GEMINI_API_KEY_3=your-production-key-3
-
-# Production database
-DATABASE_URL=mongodb://user:pass@production-cluster.mongodb.net/chatapp
-
-# Admin notifications
-ADMIN_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK
-
-# Optional: Error tracking
-SENTRY_DSN=https://your-sentry-dsn
-```
-
----
-
-### Monitoring
-
-**Key Metrics to Monitor:**
-
-1. **API Usage:**
-   ```bash
-   # Check via endpoint
-   curl https://api.yourapp.com/api/stats
-   ```
-2. **Detection Rate:**
-   * How many messages flagged
-   * False positive rate
-   * False negative rate
-3. **Response Times:**
-   * Text detection: target < 2 seconds
-   * Image detection: target < 5 seconds
-4. **Error Rates:**
-   * API key errors
-   * Rate limit hits
-   * Service failures
-
-**Set Up Alerts:**
-
-* Rate limit hits > 10/hour
-* Error rate > 1%
-* Response time > 10 seconds
-
----
-
-## 📚 Additional Resources
-
-### Documentation
-
-* **Main README:** Complete system overview
-* **SETUP_GUIDE.md:** Detailed setup with troubleshooting
-* **IMAGE_DETECTION_GUIDE.md:** Image detection specifics
-* **DEPLOYMENT.md:** AWS deployment guide
-* **FIXES_SUMMARY.md:** Bug fixes and improvements
-
-### External Links
-
-* **Get API Keys:** https://aistudio.google.com/app/apikey
-* **Gemini Docs:** https://ai.google.dev/gemini-api/docs
-* **Rate Limits:** https://ai.google.dev/gemini-api/docs/rate-limits
-* **Pricing:** https://ai.google.dev/gemini-api/docs/pricing
-
----
-
-## 🎉 Quick Reference
-
-### Commands
-
-```bash
-# Setup
-cp .env.example .env         # Create environment file
-npm install                  # Install dependencies
-npm run validate             # Validate setup
-
-# Running
-npm start                    # Start production server
-npm run dev                  # Start with auto-reload
-
-# Testing
-npm test                     # Test text detection
-npm run test-image           # Test image detection
-
-# Monitoring
-curl localhost:3000/health   # Health check
-curl localhost:3000/api/stats # Usage statistics
-```
-
----
-
-### API Endpoints Quick Reference
-
-| Endpoint                        | Method | Purpose                   |
-| ------------------------------- | ------ | ------------------------- |
-| `/api/chat/send-message`      | POST   | Send text with PII check  |
-| `/api/chat/send-image`        | POST   | Send image with PII check |
-| `/api/admin/flagged-messages` | GET    | Get flagged messages      |
-| `/api/test/detect-pii`        | POST   | Test detection            |
-| `/api/stats`                  | GET    | View statistics           |
-
----
-
-### Configuration Quick Reference
-
-```javascript
-// Middleware
-chatMiddleware.updateConfig({
-  blockOnDetection: false,    // false = flag only
-  forwardToReceiver: true,    // true = forward anyway
-  saveOriginalMessage: true   // true = save for review
-});
-
-// Service
-const piiService = new PIIDetectionService(keys, {
-  model: 'gemini-2.0-flash-exp',
-  maxRetries: 3,
-  enableLogging: true
-});
-```
-
----
-
-## 💡 Best Practices
-
-### For MVP Testing
-
-1. **Start with 3-5 free API keys**
-2. **Use flag-only mode** (don't block messages)
-3. **Monitor false positives** via admin dashboard
-4. **Test with real user scenarios**
-5. **Check `/api/stats` regularly**
-
-### For Production
-
-1. **Upgrade to paid tier** ($0.075 per 1M tokens)
-2. **Use 3-5 paid keys** for redundancy
-3. **Enable database storage** for flagged messages
-4. **Set up admin webhooks** for real-time alerts
-5. **Implement monitoring** and error tracking
-6. **Regular key rotation** (every 3-6 months)
-7. **Load testing** before launch
-8. **Have rollback plan** ready
-
----
-
-## 📞 Support
-
-### Team Support
-
-* **Technical Lead:** [Your name]
-* **Slack Channel:** #pii-detection
-* **Email:** tech-team@yourcompany.com
-
-### Quick Help
-
-1. **Run validation:** `npm run validate`
-2. **Check logs:** Look for `[PII Detection Error]`
-3. **Test directly:** `npm test`
-4. **Review docs:** `SETUP_GUIDE.md`
-
----
-
-## ✅ Team Checklist
-
-### Initial Setup
-
-* [ ] Clone repository
-* [ ] Run `npm install`
-* [ ] Copy `.env.example` to `.env`
-* [ ] Get Gemini API keys from Google
-* [ ] Add keys to `.env`
-* [ ] Run `npm run validate`
-* [ ] Start server with `npm start`
-* [ ] Run tests: `npm test` and `npm run test-image`
-
-### Integration
-
-* [ ] Update API_BASE_URL in frontend
-* [ ] Add middleware to existing routes
-* [ ] Update message sending functions
-* [ ] Add image upload endpoint
-* [ ] Handle flagged responses in UI
-* [ ] Test end-to-end flow
-* [ ] Set up admin dashboard (optional)
-
-### Production
-
-* [ ] Upgrade to paid API keys
-* [ ] Configure production database
-* [ ] Set up image storage (S3/Cloudinary)
-* [ ] Enable monitoring and alerts
-* [ ] Deploy to AWS/cloud
-* [ ] Load test with expected traffic
-* [ ] Document any custom changes
-
----
-
-**🚀 You're all set! The system is production-ready with valid API keys.**
-
-For questions, check the documentation files or contact the technical AI lead @ [Basim Bashir](basim.bashir0968@gmail.com "basim.bashir0968@gmail.com").
+**Start integrating:** Copy the 4 files from `src/` and follow the Quick Start guide above!

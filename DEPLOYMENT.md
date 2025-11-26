@@ -1,12 +1,130 @@
-# AWS Deployment Guide
+# Deployment Guide
 
-## 🚀 Deploying PII Detection Service to AWS
+## 🚀 Deploying PII Detection Service
 
-This guide covers deploying your Node.js PII detection service to AWS using various methods.
+This guide covers testing and deploying your TypeScript PII detection service to production.
 
 ---
 
-## Option 1: AWS Elastic Beanstalk (Recommended for MVP)
+## ⚠️ IMPORTANT: Test Locally First!
+
+**Before deploying to production, thoroughly test the system locally.**
+
+### Pre-Deployment Testing Checklist
+
+✅ **1. Local Server Testing**
+
+```bash
+# Setup
+copy .env.example .env
+# Add your Gemini API keys to .env
+
+# Install & Build
+npm install
+npm run build
+
+# Start server
+npm run dev
+```
+
+✅ **2. Run Automated Tests**
+
+```bash
+# Run test suite
+test-all.bat
+```
+
+**Expected Results:**
+- All 6 tests pass
+- Health check returns "ok"
+- PII detection works (phone, email, social media)
+- Clean messages NOT flagged
+- API stats show correct counts
+
+✅ **3. Visual Testing with Web UI**
+
+1. Start server: `npm run dev`
+2. Open `test-ui.html` in browser
+3. Test all features:
+   - Health check ✅
+   - Quick tests (phone, email, etc.) ✅
+   - Custom message testing ✅
+   - Send message flow ✅
+   - API statistics ✅
+
+✅ **4. Manual API Testing**
+
+```bash
+# Test health endpoint
+curl http://localhost:3000/health
+
+# Test PII detection
+curl -X POST http://localhost:3000/api/test/detect-pii ^
+  -H "Content-Type: application/json" ^
+  -d "{\"text\": \"Call me at 555-1234\", \"userId\": \"test\"}"
+
+# Verify response shows PII detected
+```
+
+✅ **5. TypeScript Compilation**
+
+```bash
+# Ensure no TypeScript errors
+npm run type-check
+npm run build
+
+# Should complete without errors
+```
+
+### Success Criteria Before Deployment
+
+Your system is ready for deployment when:
+
+- ✅ All automated tests pass
+- ✅ TypeScript compiles without errors
+- ✅ Server starts successfully
+- ✅ PII detection accuracy is >95%
+- ✅ No false positives on clean messages
+- ✅ API rate limiting works with multiple keys
+- ✅ All endpoints respond correctly
+
+**If any test fails, DO NOT deploy. Fix issues locally first.**
+
+---
+
+## 📁 Files to Deploy
+
+Ensure these files are included in your deployment:
+
+```
+pii-detection-system/
+├── src/                    # TypeScript source
+│   ├── types/
+│   ├── services/
+│   ├── middleware/
+│   ├── index.ts
+│   └── server.ts
+│
+├── dist/                   # Compiled JavaScript (after build)
+├── package.json
+├── package-lock.json
+├── tsconfig.json
+├── .env (with real API keys)
+└── node_modules/          # Will be installed on server
+```
+
+**DO NOT deploy:**
+- ❌ `test-all.bat`
+- ❌ `test-ui.html`
+- ❌ `TEST_LOCALLY.md`
+- ❌ `.git/` folder
+- ❌ `EXAMPLE_INTEGRATION.ts`
+
+---
+
+## 🌐 Deployment Options
+
+### Option 1: AWS Elastic Beanstalk (Recommended for MVP)
 
 ### Prerequisites
 

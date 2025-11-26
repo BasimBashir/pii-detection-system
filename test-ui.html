@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PII Detection System - Test UI</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 16px;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .test-section h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 20px;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        input, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            transition: border-color 0.3s;
+        }
+
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            background: white;
+            border: 2px solid #ddd;
+            display: none;
+        }
+
+        .result.show {
+            display: block;
+        }
+
+        .result.success {
+            border-color: #28a745;
+            background: #d4edda;
+        }
+
+        .result.error {
+            border-color: #dc3545;
+            background: #f8d7da;
+        }
+
+        .result.warning {
+            border-color: #ffc107;
+            background: #fff3cd;
+        }
+
+        .result pre {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            margin-top: 10px;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+
+        .status-badge.detected {
+            background: #dc3545;
+            color: white;
+        }
+
+        .status-badge.clean {
+            background: #28a745;
+            color: white;
+        }
+
+        .quick-tests {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .quick-test-btn {
+            padding: 15px;
+            background: white;
+            border: 2px solid #667eea;
+            color: #667eea;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .quick-test-btn:hover {
+            background: #667eea;
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🛡️ PII Detection System</h1>
+            <p>Test TypeScript PII Detection Service</p>
+        </div>
+
+        <div class="content">
+            <!-- Health Check -->
+            <div class="test-section">
+                <h2>🏥 Health Check</h2>
+                <button onclick="testHealth()">Check Server Status</button>
+                <div id="health-result" class="result"></div>
+            </div>
+
+            <!-- Quick Tests -->
+            <div class="test-section">
+                <h2>⚡ Quick Tests</h2>
+                <div class="quick-tests">
+                    <button class="quick-test-btn" onclick="quickTest('Call me at 555-1234')">📞 Phone Number</button>
+                    <button class="quick-test-btn" onclick="quickTest('Email: john@example.com')">📧 Email</button>
+                    <button class="quick-test-btn" onclick="quickTest('Find me on insta: john123')">📱 Social Media</button>
+                    <button class="quick-test-btn" onclick="quickTest('My number is 5 5 5-1234')">🔢 Obfuscated</button>
+                    <button class="quick-test-btn" onclick="quickTest('Hello, how are you?')">✅ Clean Message</button>
+                </div>
+                <div id="quick-result" class="result"></div>
+            </div>
+
+            <!-- Custom Test -->
+            <div class="test-section">
+                <h2>✏️ Custom Test</h2>
+                <div class="input-group">
+                    <label for="custom-text">Enter message to test:</label>
+                    <textarea id="custom-text" placeholder="Type any message here to test for PII..."></textarea>
+                </div>
+                <div class="input-group">
+                    <label for="user-id">User ID (optional):</label>
+                    <input type="text" id="user-id" value="test-user" placeholder="test-user">
+                </div>
+                <button onclick="testCustom()">Detect PII</button>
+                <div id="custom-result" class="result"></div>
+            </div>
+
+            <!-- Send Message Test -->
+            <div class="test-section">
+                <h2>💬 Send Message Test</h2>
+                <div class="input-group">
+                    <label for="message">Message:</label>
+                    <textarea id="message" placeholder="Type a message..."></textarea>
+                </div>
+                <div class="input-group">
+                    <label for="sender">Sender ID:</label>
+                    <input type="text" id="sender" value="user123">
+                </div>
+                <div class="input-group">
+                    <label for="receiver">Receiver ID:</label>
+                    <input type="text" id="receiver" value="user456">
+                </div>
+                <button onclick="testSendMessage()">Send Message</button>
+                <div id="send-result" class="result"></div>
+            </div>
+
+            <!-- API Stats -->
+            <div class="test-section">
+                <h2>📊 API Statistics</h2>
+                <button onclick="testStats()">Get Usage Stats</button>
+                <div id="stats-result" class="result"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3000';
+
+        async function testHealth() {
+            const result = document.getElementById('health-result');
+            result.className = 'result show';
+            result.innerHTML = '<div class="loading"></div> Checking server...';
+
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+
+                if (data.status === 'ok') {
+                    result.className = 'result show success';
+                    result.innerHTML = `
+                        <strong>✅ Server is running!</strong>
+                        <div class="status-badge clean">Online</div>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    throw new Error('Server returned non-ok status');
+                }
+            } catch (error) {
+                result.className = 'result show error';
+                result.innerHTML = `
+                    <strong>❌ Server is not running</strong>
+                    <p>Make sure the server is started with: <code>npm run dev</code></p>
+                    <pre>${error.message}</pre>
+                `;
+            }
+        }
+
+        async function quickTest(text) {
+            const result = document.getElementById('quick-result');
+            result.className = 'result show';
+            result.innerHTML = '<div class="loading"></div> Testing...';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/test/detect-pii`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text, userId: 'test-user' })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    const hasPII = data.detection.hasPII;
+                    result.className = `result show ${hasPII ? 'warning' : 'success'}`;
+                    result.innerHTML = `
+                        <strong>${hasPII ? '⚠️ PII Detected!' : '✅ Clean Message'}</strong>
+                        <div class="status-badge ${hasPII ? 'detected' : 'clean'}">
+                            ${hasPII ? 'Flagged' : 'Safe'}
+                        </div>
+                        <p><strong>Tested:</strong> "${text}"</p>
+                        ${hasPII ? `<p><strong>Risk Level:</strong> ${data.detection.riskLevel}</p>` : ''}
+                        <pre>${JSON.stringify(data.detection, null, 2)}</pre>
+                    `;
+                } else {
+                    throw new Error('Detection failed');
+                }
+            } catch (error) {
+                result.className = 'result show error';
+                result.innerHTML = `<strong>❌ Error:</strong> ${error.message}`;
+            }
+        }
+
+        async function testCustom() {
+            const text = document.getElementById('custom-text').value;
+            const userId = document.getElementById('user-id').value;
+            const result = document.getElementById('custom-result');
+
+            if (!text.trim()) {
+                result.className = 'result show error';
+                result.innerHTML = '<strong>⚠️ Please enter a message to test</strong>';
+                return;
+            }
+
+            result.className = 'result show';
+            result.innerHTML = '<div class="loading"></div> Analyzing message...';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/test/detect-pii`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text, userId })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    const hasPII = data.detection.hasPII;
+                    result.className = `result show ${hasPII ? 'warning' : 'success'}`;
+                    result.innerHTML = `
+                        <strong>${hasPII ? '⚠️ PII Detected!' : '✅ Clean Message'}</strong>
+                        <div class="status-badge ${hasPII ? 'detected' : 'clean'}">
+                            ${hasPII ? 'Flagged' : 'Safe'}
+                        </div>
+                        ${hasPII ? `
+                            <p><strong>Confidence:</strong> ${data.detection.confidence}%</p>
+                            <p><strong>Risk Level:</strong> ${data.detection.riskLevel}</p>
+                            <p><strong>Detected Items:</strong></p>
+                            <ul>
+                                ${data.detection.detectedItems.map(item =>
+                                    `<li>${item.type}: ${item.value || item.description} (${item.severity})</li>`
+                                ).join('')}
+                            </ul>
+                        ` : ''}
+                        <pre>${JSON.stringify(data.detection, null, 2)}</pre>
+                    `;
+                } else {
+                    throw new Error('Detection failed');
+                }
+            } catch (error) {
+                result.className = 'result show error';
+                result.innerHTML = `<strong>❌ Error:</strong> ${error.message}`;
+            }
+        }
+
+        async function testSendMessage() {
+            const message = document.getElementById('message').value;
+            const senderId = document.getElementById('sender').value;
+            const receiverId = document.getElementById('receiver').value;
+            const result = document.getElementById('send-result');
+
+            if (!message.trim()) {
+                result.className = 'result show error';
+                result.innerHTML = '<strong>⚠️ Please enter a message</strong>';
+                return;
+            }
+
+            result.className = 'result show';
+            result.innerHTML = '<div class="loading"></div> Sending message...';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/chat/send-message`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message, senderId, receiverId })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    const flagged = data.data.flagged;
+                    result.className = `result show ${flagged ? 'warning' : 'success'}`;
+                    result.innerHTML = `
+                        <strong>${flagged ? '⚠️ Message Flagged!' : '✅ Message Sent'}</strong>
+                        <div class="status-badge ${flagged ? 'detected' : 'clean'}">
+                            ${flagged ? 'Flagged for Review' : 'Delivered'}
+                        </div>
+                        <p><strong>Message ID:</strong> ${data.data.messageId}</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    throw new Error('Send failed');
+                }
+            } catch (error) {
+                result.className = 'result show error';
+                result.innerHTML = `<strong>❌ Error:</strong> ${error.message}`;
+            }
+        }
+
+        async function testStats() {
+            const result = document.getElementById('stats-result');
+            result.className = 'result show';
+            result.innerHTML = '<div class="loading"></div> Loading stats...';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/stats`);
+                const data = await response.json();
+
+                if (data.success) {
+                    result.className = 'result show success';
+                    result.innerHTML = `
+                        <strong>📊 API Usage Statistics</strong>
+                        <p><strong>Total API Keys:</strong> ${data.totalKeys}</p>
+                        <pre>${JSON.stringify(data.stats, null, 2)}</pre>
+                    `;
+                } else {
+                    throw new Error('Failed to load stats');
+                }
+            } catch (error) {
+                result.className = 'result show error';
+                result.innerHTML = `<strong>❌ Error:</strong> ${error.message}`;
+            }
+        }
+
+        // Auto-run health check on page load
+        window.addEventListener('load', () => {
+            setTimeout(testHealth, 500);
+        });
+    </script>
+</body>
+</html>

@@ -3,51 +3,49 @@
  * Integrates seamlessly with React Native/React.js chat applications
  */
 
-const PIIDetectionService = require('./pii-detection-service');
+import { Request, Response, NextFunction } from 'express';
+import { PIIDetectionService } from '../services/PIIDetectionService';
+import { ChatMiddlewareConfig, MessageRequestBody } from '../types';
 
-class ChatPIIMiddleware {
-  constructor(piiService) {
+export class ChatPIIMiddleware {
+  private piiService: PIIDetectionService;
+  private config: ChatMiddlewareConfig;
+
+  constructor(piiService: PIIDetectionService) {
     this.piiService = piiService;
     this.config = {
-      blockOnDetection: false,  // Set to true to block messages with PII
-      forwardToReceiver: true,  // Forward flagged messages to receiver
-      saveOriginalMessage: true // Save original message even if blocked
+      blockOnDetection: false,
+      forwardToReceiver: true,
+      saveOriginalMessage: true
     };
   }
 
-  /**
-   * Middleware for text messages
-   */
-  checkTextMessage = async (req, res, next) => {
+  public checkTextMessage = async (
+    req: Request<{}, {}, MessageRequestBody>,
+    res: Response,
+    next: NextFunction
+  ): Promise<void | Response> => {
     try {
       const { message, senderId, receiverId, conversationId } = req.body;
 
       if (!message || !senderId) {
-        return res.status(400).json({ 
-          error: 'Message and senderId are required' 
+        return res.status(400).json({
+          error: 'Message and senderId are required'
         });
       }
 
-      // Detect PII in message
-      const detection = await this.piiService.detectPIIInText(
-        message,
-        senderId,
-        {
-          receiverId,
-          conversationId,
-          messageType: 'text'
-        }
-      );
+      const detection = await this.piiService.detectPIIInText(message, senderId, {
+        receiverId,
+        conversationId,
+        messageType: 'text'
+      });
 
-      // Add detection result to request
       req.piiDetection = detection;
 
-      // Handle based on configuration
       if (detection.hasPII) {
         console.log(`[PII Middleware] Detected PII from user ${senderId}`);
 
         if (this.config.blockOnDetection) {
-          // Block the message
           return res.status(403).json({
             success: false,
             error: 'Message blocked: Contains contact information',
@@ -59,7 +57,6 @@ class ChatPIIMiddleware {
           });
         }
 
-        // Flag but forward
         req.body.flagged = true;
         req.body.flagReason = 'PII_DETECTED';
         req.body.detection = {
@@ -69,43 +66,39 @@ class ChatPIIMiddleware {
         };
       }
 
-      // Continue to next middleware/handler
       next();
-
     } catch (error) {
       console.error('[PII Middleware Error]', error);
-      
-      // Don't block message on error, but log it
+
       req.body.flagged = true;
       req.body.flagReason = 'PII_CHECK_ERROR';
       next();
     }
   };
 
-  /**
-   * Middleware for image messages
-   */
-  checkImageMessage = async (req, res, next) => {
+  public checkImageMessage = async (
+    req: Request<{}, {}, MessageRequestBody>,
+    res: Response,
+    next: NextFunction
+  ): Promise<void | Response> => {
     try {
       const { imageData, senderId, receiverId, conversationId } = req.body;
-      const imageFile = req.file; // If using multer
+      const imageFile = req.file;
 
       if (!imageData && !imageFile) {
-        return res.status(400).json({ 
-          error: 'Image data is required' 
+        return res.status(400).json({
+          error: 'Image data is required'
         });
       }
 
-      let base64Data, mimeType;
+      let base64Data: string;
+      let mimeType: string;
 
-      // Handle different image input formats
       if (imageFile) {
         base64Data = imageFile.buffer.toString('base64');
         mimeType = imageFile.mimetype;
       } else if (imageData) {
-        // Assume imageData is already base64 or includes format info
         if (typeof imageData === 'string') {
-          // Extract base64 data from data URL if present
           const matches = imageData.match(/^data:(.+);base64,(.+)$/);
           if (matches) {
             mimeType = matches[1];
@@ -114,16 +107,21 @@ class ChatPIIMiddleware {
             base64Data = imageData;
             mimeType = 'image/jpeg';
           }
-        } else if (imageData.base64 && imageData.mimeType) {
+        } else if ('base64' in imageData && 'mimeType' in imageData) {
           base64Data = imageData.base64;
           mimeType = imageData.mimeType;
+        } else {
+          base64Data = '';
+          mimeType = 'image/jpeg';
         }
+      } else {
+        base64Data = '';
+        mimeType = 'image/jpeg';
       }
 
-      // Detect PII in image
       const detection = await this.piiService.detectPIIInImage(
         { base64: base64Data, mimeType },
-        senderId,
+        senderId || 'unknown',
         {
           receiverId,
           conversationId,
@@ -159,7 +157,6 @@ class ChatPIIMiddleware {
       }
 
       next();
-
     } catch (error) {
       console.error('[PII Image Middleware Error]', error);
       req.body.flagged = true;
@@ -168,12 +165,7 @@ class ChatPIIMiddleware {
     }
   };
 
-  /**
-   * Update configuration
-   */
-  updateConfig(newConfig) {
+  public updateConfig(newConfig: Partial<ChatMiddlewareConfig>): void {
     this.config = { ...this.config, ...newConfig };
   }
 }
-
-module.exports = ChatPIIMiddleware;

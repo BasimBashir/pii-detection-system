@@ -1,24 +1,34 @@
 /**
  * PII Detection Service using Google Gemini API
  * Detects contact information in text and images with auto-scaling API key rotation
- * 
- * Features:
- * - Multi-modal PII detection (text + images)
- * - Auto-scaling API key rotation on rate limits
- * - Advanced pattern detection for obfuscated contact info
- * - Logging and flagging system
  */
 
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
+import {
+  PIIDetectionConfig,
+  KeyUsageStats,
+  DetectionResult,
+  DetectionData,
+  ImageData,
+  UsageStatsResponse,
+  AdminWebhookPayload
+} from '../types';
 
-class PIIDetectionService {
-  constructor(apiKeys = [], config = {}) {
+export class PIIDetectionService {
+  private apiKeys: string[];
+  private currentKeyIndex: number = 0;
+  private keyUsageStats: KeyUsageStats[];
+  public config: Required<PIIDetectionConfig>;
+  private rateLimitResetTimes: Map<number, number>;
+  private genAI!: GoogleGenerativeAI;
+  private model!: GenerativeModel;
+
+  constructor(apiKeys: string[] = [], config: PIIDetectionConfig = {}) {
     if (!Array.isArray(apiKeys) || apiKeys.length === 0) {
       throw new Error('At least one API key is required');
     }
 
     this.apiKeys = apiKeys;
-    this.currentKeyIndex = 0;
     this.keyUsageStats = apiKeys.map(() => ({
       requests: 0,
       errors: 0,
@@ -26,7 +36,6 @@ class PIIDetectionService {
       rateLimitHits: 0
     }));
 
-    // Configuration
     this.config = {
       model: config.model || 'gemini-2.5-flash',
       maxRetries: config.maxRetries || 3,
@@ -37,48 +46,39 @@ class PIIDetectionService {
       ...config
     };
 
-    // Rate limit tracking per API key
     this.rateLimitResetTimes = new Map();
-    
-    // Initialize Gemini client with first key
     this.initializeClient();
-    
+
     console.log(`[PII Detection] Service initialized with ${apiKeys.length} API keys`);
   }
 
-  initializeClient() {
+  private initializeClient(): void {
     const currentKey = this.apiKeys[this.currentKeyIndex];
     this.genAI = new GoogleGenerativeAI(currentKey);
     this.model = this.genAI.getGenerativeModel({ model: this.config.model });
   }
 
-  /**
-   * Rotates to the next available API key
-   */
-  rotateAPIKey() {
+  private rotateAPIKey(): number {
     const previousIndex = this.currentKeyIndex;
     this.currentKeyIndex = (this.currentKeyIndex + 1) % this.apiKeys.length;
-    
+
     this.keyUsageStats[previousIndex].rateLimitHits++;
-    this.rateLimitResetTimes.set(previousIndex, Date.now() + 60000); // Reset after 1 minute
-    
+    this.rateLimitResetTimes.set(previousIndex, Date.now() + 60000);
+
     this.initializeClient();
-    
+
     console.log(`[API Key Rotation] Switched from key ${previousIndex} to key ${this.currentKeyIndex}`);
-    
+
     return this.currentKeyIndex;
   }
 
-  /**
-   * Finds the best available API key (not rate limited)
-   */
-  findAvailableKey() {
+  private findAvailableKey(): boolean {
     const now = Date.now();
-    
+
     for (let i = 0; i < this.apiKeys.length; i++) {
       const keyIndex = (this.currentKeyIndex + i) % this.apiKeys.length;
       const resetTime = this.rateLimitResetTimes.get(keyIndex);
-      
+
       if (!resetTime || now > resetTime) {
         if (keyIndex !== this.currentKeyIndex) {
           this.currentKeyIndex = keyIndex;
@@ -88,24 +88,25 @@ class PIIDetectionService {
         return true;
       }
     }
-    
-    return false; // All keys are rate limited
+
+    return false;
   }
 
-  /**
-   * Main detection method - analyzes text for PII
-   */
-  async detectPIIInText(text, userId, metadata = {}) {
+  public async detectPIIInText(
+    text: string,
+    userId: string,
+    metadata: Record<string, any> = {}
+  ): Promise<DetectionResult> {
     if (!text || typeof text !== 'string') {
       throw new Error('Valid text string is required');
     }
 
     const prompt = this.buildTextDetectionPrompt(text);
-    
+
     try {
       const result = await this.callGeminiWithRetry(prompt);
       const detection = this.parseDetectionResult(result);
-      
+
       if (detection.hasPII) {
         await this.handleDetection({
           type: 'text',
@@ -116,7 +117,7 @@ class PIIDetectionService {
           timestamp: new Date().toISOString()
         });
       }
-      
+
       return detection;
     } catch (error) {
       console.error('[PII Detection Error]', error);
@@ -124,27 +125,28 @@ class PIIDetectionService {
     }
   }
 
-  /**
-   * Analyzes images for PII (text in images)
-   */
-  async detectPIIInImage(imageData, userId, metadata = {}) {
+  public async detectPIIInImage(
+    imageData: ImageData | string,
+    userId: string,
+    metadata: Record<string, any> = {}
+  ): Promise<DetectionResult> {
     if (!imageData) {
       throw new Error('Image data is required');
     }
 
     const prompt = this.buildImageDetectionPrompt();
-    
+
     try {
       const imagePart = {
         inlineData: {
-          data: imageData.base64 || imageData,
-          mimeType: imageData.mimeType || 'image/jpeg'
+          data: typeof imageData === 'string' ? imageData : imageData.base64,
+          mimeType: typeof imageData === 'string' ? 'image/jpeg' : imageData.mimeType
         }
       };
 
       const result = await this.callGeminiWithRetry([prompt, imagePart]);
       const detection = this.parseDetectionResult(result);
-      
+
       if (detection.hasPII) {
         await this.handleDetection({
           type: 'image',
@@ -154,7 +156,7 @@ class PIIDetectionService {
           timestamp: new Date().toISOString()
         });
       }
-      
+
       return detection;
     } catch (error) {
       console.error('[PII Image Detection Error]', error);
@@ -162,10 +164,7 @@ class PIIDetectionService {
     }
   }
 
-  /**
-   * Calls Gemini API with automatic retry and key rotation
-   */
-  async callGeminiWithRetry(content, attempt = 1) {
+  private async callGeminiWithRetry(content: any, attempt: number = 1): Promise<string> {
     try {
       this.keyUsageStats[this.currentKeyIndex].requests++;
       this.keyUsageStats[this.currentKeyIndex].lastUsed = new Date().toISOString();
@@ -173,12 +172,10 @@ class PIIDetectionService {
       const result = await this.model.generateContent(content);
       const response = await result.response;
       return response.text();
-
-    } catch (error) {
+    } catch (error: any) {
       this.keyUsageStats[this.currentKeyIndex].errors++;
 
-      // Check if it's a rate limit error (429)
-      const isRateLimitError = 
+      const isRateLimitError =
         error.message?.includes('429') ||
         error.message?.includes('rate limit') ||
         error.message?.includes('RESOURCE_EXHAUSTED') ||
@@ -186,10 +183,9 @@ class PIIDetectionService {
 
       if (isRateLimitError) {
         console.warn(`[Rate Limit] Key ${this.currentKeyIndex} hit rate limit`);
-        
-        // Try to find an available key
+
         const hasAvailableKey = this.findAvailableKey();
-        
+
         if (hasAvailableKey && attempt <= this.config.maxRetries) {
           console.log(`[Retry] Attempt ${attempt}/${this.config.maxRetries} with different key`);
           await this.sleep(this.config.retryDelay);
@@ -200,17 +196,15 @@ class PIIDetectionService {
         }
       }
 
-      // For other errors, retry with exponential backoff
       if (attempt <= this.config.maxRetries) {
         const backoffDelay = this.config.retryDelay * Math.pow(2, attempt - 1);
         console.log(`[Retry] Attempt ${attempt}/${this.config.maxRetries} after ${backoffDelay}ms`);
         await this.sleep(backoffDelay);
-        
-        // Try rotating to next key for non-rate-limit errors too
+
         if (attempt > 1) {
           this.rotateAPIKey();
         }
-        
+
         return this.callGeminiWithRetry(content, attempt + 1);
       }
 
@@ -218,11 +212,8 @@ class PIIDetectionService {
     }
   }
 
-  /**
-   * Builds comprehensive prompt for text PII detection
-   */
-  buildTextDetectionPrompt(text) {
-    return `You are an advanced PII (Personally Identifiable Information) detection system. 
+  private buildTextDetectionPrompt(text: string): string {
+    return `You are an advanced PII (Personally Identifiable Information) detection system.
 Your task is to analyze the following text and detect ANY form of contact information or attempts to share it.
 
 DETECTION RULES:
@@ -286,10 +277,7 @@ REQUIRED OUTPUT FORMAT (JSON only, no markdown):
 IMPORTANT: Be extremely thorough. Even subtle hints of contact sharing should be flagged.`;
   }
 
-  /**
-   * Builds prompt for image PII detection
-   */
-  buildImageDetectionPrompt() {
+  private buildImageDetectionPrompt(): string {
     return `You are an advanced PII detection system analyzing an IMAGE for contact information.
 
 SCAN FOR:
@@ -328,19 +316,15 @@ REQUIRED OUTPUT FORMAT (JSON only, no markdown):
 }`;
   }
 
-  /**
-   * Parses the Gemini API response
-   */
-  parseDetectionResult(responseText) {
+  private parseDetectionResult(responseText: string): DetectionResult {
     try {
-      // Remove markdown code blocks if present
       let cleanedText = responseText.trim();
       cleanedText = cleanedText.replace(/```json\n?/g, '');
       cleanedText = cleanedText.replace(/```\n?/g, '');
       cleanedText = cleanedText.trim();
 
       const parsed = JSON.parse(cleanedText);
-      
+
       return {
         hasPII: parsed.hasPII || false,
         confidence: parsed.confidence || 0,
@@ -352,13 +336,13 @@ REQUIRED OUTPUT FORMAT (JSON only, no markdown):
     } catch (error) {
       console.error('[Parse Error]', error);
       console.error('[Response Text]', responseText);
-      
-      // Fallback - if parsing fails but response suggests PII
-      const hasPIIIndicators = responseText.toLowerCase().includes('detected') ||
-                              responseText.toLowerCase().includes('found') ||
-                              responseText.toLowerCase().includes('phone') ||
-                              responseText.toLowerCase().includes('email');
-      
+
+      const hasPIIIndicators =
+        responseText.toLowerCase().includes('detected') ||
+        responseText.toLowerCase().includes('found') ||
+        responseText.toLowerCase().includes('phone') ||
+        responseText.toLowerCase().includes('email');
+
       return {
         hasPII: hasPIIIndicators,
         confidence: 50,
@@ -370,10 +354,7 @@ REQUIRED OUTPUT FORMAT (JSON only, no markdown):
     }
   }
 
-  /**
-   * Handles detected PII - saves to database and notifies admin
-   */
-  async handleDetection(detectionData) {
+  private async handleDetection(detectionData: DetectionData): Promise<DetectionData> {
     if (this.config.enableLogging) {
       console.log('[PII DETECTED]', {
         type: detectionData.type,
@@ -383,7 +364,6 @@ REQUIRED OUTPUT FORMAT (JSON only, no markdown):
       });
     }
 
-    // Save to database
     if (this.config.databaseUrl) {
       try {
         await this.saveToDatabase(detectionData);
@@ -392,7 +372,6 @@ REQUIRED OUTPUT FORMAT (JSON only, no markdown):
       }
     }
 
-    // Notify admin if webhook configured
     if (this.config.adminWebhook) {
       try {
         await this.notifyAdmin(detectionData);
@@ -404,47 +383,27 @@ REQUIRED OUTPUT FORMAT (JSON only, no markdown):
     return detectionData;
   }
 
-  /**
-   * Saves detection to database (implement based on your DB)
-   */
-  async saveToDatabase(detectionData) {
-    // This is a placeholder - implement based on your database
-    // Example for MongoDB/PostgreSQL/etc.
+  private async saveToDatabase(detectionData: DetectionData): Promise<void> {
     console.log('[Database] Would save detection:', detectionData);
-    
-    // Example structure:
-    /*
-    await db.collection('pii_detections').insertOne({
-      userId: detectionData.userId,
-      type: detectionData.type,
-      content: detectionData.content || '[image]',
-      detection: detectionData.detection,
-      metadata: detectionData.metadata,
-      timestamp: detectionData.timestamp,
-      handled: false
-    });
-    */
   }
 
-  /**
-   * Notifies admin team about PII detection
-   */
-  async notifyAdmin(detectionData) {
-    // Example webhook notification
+  private async notifyAdmin(detectionData: DetectionData): Promise<void> {
     try {
-      const response = await fetch(this.config.adminWebhook, {
+      const payload: AdminWebhookPayload = {
+        alert: 'PII_DETECTED',
+        severity: detectionData.detection.riskLevel,
+        userId: detectionData.userId,
+        type: detectionData.type,
+        detectedItems: detectionData.detection.detectedItems,
+        timestamp: detectionData.timestamp
+      };
+
+      const response = await fetch(this.config.adminWebhook!, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          alert: 'PII_DETECTED',
-          severity: detectionData.detection.riskLevel,
-          userId: detectionData.userId,
-          type: detectionData.type,
-          detectedItems: detectionData.detection.detectedItems,
-          timestamp: detectionData.timestamp
-        })
+        body: JSON.stringify(payload)
       });
 
       if (!response.ok) {
@@ -457,10 +416,7 @@ REQUIRED OUTPUT FORMAT (JSON only, no markdown):
     }
   }
 
-  /**
-   * Returns usage statistics for all API keys
-   */
-  getUsageStats() {
+  public getUsageStats(): UsageStatsResponse[] {
     return this.apiKeys.map((key, index) => ({
       keyIndex: index,
       keyPreview: `${key.substring(0, 8)}...`,
@@ -469,12 +425,7 @@ REQUIRED OUTPUT FORMAT (JSON only, no markdown):
     }));
   }
 
-  /**
-   * Helper function for delays
-   */
-  sleep(ms) {
+  private sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 }
-
-module.exports = PIIDetectionService;

@@ -1,29 +1,27 @@
 /**
  * Express Server with PII Detection Integration
- * Example implementation for chat application backend
+ * TypeScript implementation for chat application backend
  */
 
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const multer = require('multer');
-const PIIDetectionService = require('./pii-detection-service');
-const ChatPIIMiddleware = require('./chat-pii-middleware');
+import 'dotenv/config';
+import express, { Request, Response, NextFunction, Application } from 'express';
+import cors from 'cors';
+import multer, { Multer } from 'multer';
+import { PIIDetectionService } from './services/PIIDetectionService';
+import { ChatPIIMiddleware } from './middleware/ChatPIIMiddleware';
+import { MessageRequestBody } from './types';
 
-// Initialize Express app
-const app = express();
-const PORT = process.env.PORT || 3000;
+const app: Application = express();
+const PORT: number = parseInt(process.env.PORT || '3000', 10);
 
-// Middleware
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Configure multer for image uploads
-const upload = multer({
+const upload: Multer = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
-  fileFilter: (req, file, cb) => {
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
     if (file.mimetype.startsWith('image/')) {
       cb(null, true);
     } else {
@@ -32,34 +30,28 @@ const upload = multer({
   }
 });
 
-// ==========================================
-// LOAD AND VALIDATE API KEYS
-// ==========================================
-
-function loadAPIKeys() {
-  const keys = [];
+function loadAPIKeys(): string[] {
+  const keys: string[] = [];
   let keyIndex = 1;
-  
-  // Load all GEMINI_API_KEY_* from environment
+
   while (true) {
     const key = process.env[`GEMINI_API_KEY_${keyIndex}`];
-    
+
     if (!key) {
-      break; // No more keys
+      break;
     }
-    
-    // Skip placeholder/invalid keys
+
     if (key.includes('your-api-key') || key.includes('your-key') || key.trim().length < 20) {
       console.warn(`[Warning] GEMINI_API_KEY_${keyIndex} appears to be a placeholder. Skipping.`);
       keyIndex++;
       continue;
     }
-    
+
     keys.push(key);
     console.log(`[Config] Loaded GEMINI_API_KEY_${keyIndex}`);
     keyIndex++;
   }
-  
+
   return keys;
 }
 
@@ -83,13 +75,12 @@ if (GEMINI_API_KEYS.length === 0) {
   process.exit(1);
 }
 
-// Initialize PII Detection Service
-let piiService;
-let chatMiddleware;
+let piiService: PIIDetectionService;
+let chatMiddleware: ChatPIIMiddleware;
 
 try {
   piiService = new PIIDetectionService(GEMINI_API_KEYS, {
-    model: 'gemini-2.5-flash', // Latest fast model
+    model: 'gemini-2.5-flash',
     maxRetries: 3,
     retryDelay: 1000,
     enableLogging: true,
@@ -97,17 +88,14 @@ try {
     adminWebhook: process.env.ADMIN_WEBHOOK_URL
   });
 
-  // Initialize Middleware
   chatMiddleware = new ChatPIIMiddleware(piiService);
 
-  // Update middleware configuration as needed
   chatMiddleware.updateConfig({
-    blockOnDetection: false,  // Set to true to block messages
-    forwardToReceiver: true,  // Forward flagged messages
+    blockOnDetection: false,
+    forwardToReceiver: true,
     saveOriginalMessage: true
   });
-
-} catch (error) {
+} catch (error: any) {
   console.error('\n===========================================');
   console.error('❌ Failed to initialize PII Detection Service');
   console.error('===========================================');
@@ -117,14 +105,7 @@ try {
   process.exit(1);
 }
 
-// ==========================================
-// ROUTES
-// ==========================================
-
-/**
- * Health check endpoint
- */
-app.get('/health', (req, res) => {
+app.get('/health', (_req: Request, res: Response) => {
   res.json({
     status: 'ok',
     service: 'PII Detection Chat Service',
@@ -133,10 +114,7 @@ app.get('/health', (req, res) => {
   });
 });
 
-/**
- * Get API usage statistics
- */
-app.get('/api/stats', (req, res) => {
+app.get('/api/stats', (_req: Request, res: Response) => {
   const stats = piiService.getUsageStats();
   res.json({
     success: true,
@@ -145,26 +123,14 @@ app.get('/api/stats', (req, res) => {
   });
 });
 
-/**
- * Send text message (with PII detection)
- */
-app.post('/api/chat/send-message', 
-  chatMiddleware.checkTextMessage, 
-  async (req, res) => {
+app.post(
+  '/api/chat/send-message',
+  chatMiddleware.checkTextMessage,
+  async (req: Request<{}, {}, MessageRequestBody>, res: Response) => {
     try {
-      const { 
-        message, 
-        senderId, 
-        receiverId, 
-        conversationId,
-        flagged,
-        flagReason,
-        detection
-      } = req.body;
+      const { message, senderId, receiverId, conversationId, flagged, flagReason, detection } =
+        req.body;
 
-      // Here you would normally save to your database
-      // For this example, we'll simulate the response
-      
       const messageData = {
         id: generateMessageId(),
         message,
@@ -177,17 +143,7 @@ app.post('/api/chat/send-message',
         detection: detection || null
       };
 
-      // Save to database here
-      // await db.messages.insert(messageData);
-
-      // If flagged, save to admin panel
       if (flagged) {
-        // await db.flaggedMessages.insert({
-        //   ...messageData,
-        //   reviewStatus: 'pending',
-        //   piiDetection: req.piiDetection
-        // });
-        
         console.log('[Flagged Message]', {
           messageId: messageData.id,
           userId: senderId,
@@ -195,8 +151,7 @@ app.post('/api/chat/send-message',
         });
       }
 
-      // Send response
-      res.json({
+      return res.json({
         success: true,
         message: 'Message sent successfully',
         data: {
@@ -205,10 +160,9 @@ app.post('/api/chat/send-message',
           timestamp: messageData.timestamp
         }
       });
-
     } catch (error) {
       console.error('[Send Message Error]', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to send message'
       });
@@ -216,22 +170,13 @@ app.post('/api/chat/send-message',
   }
 );
 
-/**
- * Send image message (with PII detection)
- */
-app.post('/api/chat/send-image',
+app.post(
+  '/api/chat/send-image',
   upload.single('image'),
   chatMiddleware.checkImageMessage,
-  async (req, res) => {
+  async (req: Request<{}, {}, MessageRequestBody>, res: Response) => {
     try {
-      const {
-        senderId,
-        receiverId,
-        conversationId,
-        flagged,
-        flagReason,
-        detection
-      } = req.body;
+      const { senderId, receiverId, conversationId, flagged, flagReason, detection } = req.body;
 
       const imageFile = req.file;
 
@@ -242,7 +187,6 @@ app.post('/api/chat/send-image',
         });
       }
 
-      // In production, upload to S3/CloudStorage
       const imageUrl = `https://your-storage.com/images/${Date.now()}_${imageFile.originalname}`;
 
       const messageData = {
@@ -258,9 +202,6 @@ app.post('/api/chat/send-image',
         detection: detection || null
       };
 
-      // Save to database
-      // await db.messages.insert(messageData);
-
       if (flagged) {
         console.log('[Flagged Image]', {
           messageId: messageData.id,
@@ -269,7 +210,7 @@ app.post('/api/chat/send-image',
         });
       }
 
-      res.json({
+      return res.json({
         success: true,
         message: 'Image sent successfully',
         data: {
@@ -279,10 +220,9 @@ app.post('/api/chat/send-image',
           timestamp: messageData.timestamp
         }
       });
-
     } catch (error) {
       console.error('[Send Image Error]', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to send image'
       });
@@ -290,73 +230,42 @@ app.post('/api/chat/send-image',
   }
 );
 
-/**
- * Admin endpoint - Get flagged messages
- */
-app.get('/api/admin/flagged-messages', async (req, res) => {
+app.get('/api/admin/flagged-messages', async (_req: Request, res: Response) => {
   try {
-    // In production, fetch from database with pagination
-    // const flaggedMessages = await db.flaggedMessages
-    //   .find({ reviewStatus: 'pending' })
-    //   .sort({ timestamp: -1 })
-    //   .limit(50);
-
-    res.json({
+    return res.json({
       success: true,
       data: {
-        flaggedMessages: [], // Replace with actual data
+        flaggedMessages: [],
         totalCount: 0
       }
     });
-
   } catch (error) {
     console.error('[Get Flagged Messages Error]', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: 'Failed to fetch flagged messages'
     });
   }
 });
 
-/**
- * Admin endpoint - Review flagged message
- */
-app.post('/api/admin/review-message', async (req, res) => {
+app.post('/api/admin/review-message', async (req: Request, res: Response) => {
   try {
-    const { messageId, action, adminNotes } = req.body;
+    const { messageId: _messageId, action: _action, adminNotes: _adminNotes } = req.body;
 
-    // action: 'approve', 'block_user', 'delete_message', 'warn_user'
-    
-    // Update in database
-    // await db.flaggedMessages.update(
-    //   { id: messageId },
-    //   { 
-    //     reviewStatus: 'reviewed',
-    //     reviewAction: action,
-    //     reviewedBy: req.adminId,
-    //     reviewedAt: new Date(),
-    //     adminNotes
-    //   }
-    // );
-
-    res.json({
+    return res.json({
       success: true,
       message: 'Message reviewed successfully'
     });
-
   } catch (error) {
     console.error('[Review Message Error]', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: 'Failed to review message'
     });
   }
 });
 
-/**
- * Test endpoint - Directly test PII detection
- */
-app.post('/api/test/detect-pii', async (req, res) => {
+app.post('/api/test/detect-pii', async (req: Request, res: Response) => {
   try {
     const { text, userId } = req.body;
 
@@ -367,58 +276,40 @@ app.post('/api/test/detect-pii', async (req, res) => {
       });
     }
 
-    const detection = await piiService.detectPIIInText(
-      text,
-      userId || 'test-user'
-    );
+    const detection = await piiService.detectPIIInText(text, userId || 'test-user');
 
-    res.json({
+    return res.json({
       success: true,
       detection
     });
-
-  } catch (error) {
+  } catch (error: any) {
     console.error('[Test Detection Error]', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: error.message
     });
   }
 });
 
-// ==========================================
-// HELPER FUNCTIONS
-// ==========================================
-
-function generateMessageId() {
+function generateMessageId(): string {
   return `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
-// ==========================================
-// ERROR HANDLING
-// ==========================================
-
-// 404 handler
-app.use((req, res) => {
+app.use((_req: Request, res: Response) => {
   res.status(404).json({
     success: false,
     error: 'Endpoint not found'
   });
 });
 
-// Global error handler
-app.use((err, req, res, next) => {
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   console.error('[Server Error]', err);
-  
+
   res.status(err.status || 500).json({
     success: false,
     error: err.message || 'Internal server error'
   });
 });
-
-// ==========================================
-// START SERVER
-// ==========================================
 
 app.listen(PORT, () => {
   console.log(`
@@ -433,4 +324,4 @@ Mode: ${process.env.NODE_ENV || 'development'}
   `);
 });
 
-module.exports = app;
+export { app, piiService, chatMiddleware };
